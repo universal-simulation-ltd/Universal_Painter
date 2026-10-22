@@ -1,0 +1,18 @@
+node_modules
+dist
+dist-ssr
+dev-dist
+*.local
+.vite
+.wrangler
+.DS_Store
+*.log
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
+# Per-user Claude Code settings
+.claude/settings.local.json
+
+# Internal project notes — not published (matches the other Universal Apps repos)
+CLAUDE.md

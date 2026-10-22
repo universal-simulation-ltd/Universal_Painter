@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+
+    <!-- ⚠️ THE THEME, BEFORE THE FIRST PIXEL. Inline so a dark-mode user never
+         sees a pale frame first. The app key holds this app's override (Tune
+         this app); absent, it follows the suite-wide choice. Light is the
+         default, so this only ever ADDS `dark`.
+         ⚠️ THE KEY IS DUPLICATED in src/stores/themeStore.ts, and
+         src/lib/theme.test.ts holds the two together. -->
+    <script>
+      try {
+        var pref = localStorage.getItem('unisim-painter-theme')
+          || localStorage.getItem('universal:color-scheme') || 'light'
+        if (pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+          document.documentElement.style.colorScheme = 'dark'
+        }
+      } catch (e) {
+        /* private mode, storage disabled: light, exactly as the store falls back. */
+      }
+    </script>
+
+    <title>Universal Painter — draw and touch up pictures, without uploading them</title>
+    <meta name="description" content="A canvas for drawing and simple photo fixes, closer to Paint than Photoshop: pencil, brush, shapes, text, fill, crop, resize, rotate, brightness and contrast. Everything happens in your browser. No upload, no account, free and open source." />
+    <meta name="author" content="UNI·SIM" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="canonical" href="https://opensource.unisim.co.uk/painter/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Universal Painter" />
+    <meta property="og:url" content="https://opensource.unisim.co.uk/painter/" />
+    <meta property="og:title" content="Universal Painter — draw and touch up pictures, without uploading them" />
+    <meta property="og:description" content="Pencil, brush, shapes, text and a fill bucket, plus crop, resize, rotate and one-tap photo fixes. Everything stays on your device. 100% free, no paywalls." />
+    <meta property="og:locale" content="en_GB" />
+    <meta name="twitter:card" content="summary" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Universal Painter",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Web browser",
+      "url": "https://opensource.unisim.co.uk/painter/",
+      "description": "A canvas for drawing and simple photo fixes, closer to Paint than Photoshop. Everything happens in your browser. No upload, no account, free and open source.",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" },
+      "author": [
+        { "@type": "Person", "name": "James Markey", "honorificSuffix": "MBE", "jobTitle": "Founder & Director", "url": "https://www.unisim.co.uk/about-james" },
+        { "@type": "Organization", "name": "UNI·SIM", "url": "https://www.unisim.co.uk" }
+      ],
+      "provider": { "@type": "Organization", "name": "UNI·SIM", "url": "https://www.unisim.co.uk" }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

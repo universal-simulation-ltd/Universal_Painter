@@ -1,0 +1,21 @@
+# Served by Workers static assets (wrangler.jsonc); the portal Worker passes
+# them through on opensource.unisim.co.uk/painter/*.
+#
+# Content-Security-Policy — what the web app really reaches for, and nothing else:
+#   • script-src: its own bundle; the one inline script in index.html (the
+#     pre-paint theme, allowed by its sha256 — change the script and the hash
+#     must change with it); 'wasm-unsafe-eval' for the HEIC decoder (libheif
+#     compiled to WebAssembly, loaded only when an iPhone photo is opened).
+#   • style-src 'unsafe-inline': React style attributes, everywhere.
+#   • connect-src: the suite changelog and update notice, Supabase (the SDK's
+#     client is created even with no accounts; it is never signed in), and
+#     data:/blob: for pictures being opened and saved.
+#   • worker-src 'self' blob:: the service worker, and the decoder's worker.
+#   • img-src: pictures are shown from blob: and data: URLs of the person's own files.
+# No analytics, no third-party script.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-UEFMecr75o4NubdvFn6GN7LK14NNoldQ4veq3A1Jjqk=' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' data: blob: https://rygfxgalojojppxmhddo.supabase.co wss://rygfxgalojojppxmhddo.supabase.co https://changelog.unisim.co.uk; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'

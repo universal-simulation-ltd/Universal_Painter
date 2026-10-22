@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Tailwind 4 defaults `dark:` to the OS media query. Painter drives it from a
+   class on <html> instead, because the suite rule is that an app opens LIGHT
+   and only goes dark when the person says so (stores/themeStore.ts). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html, body {
+  margin: 0;
+}
+
+html.dark {
+  background-color: #020617;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* iOS zooms in on a focused control under 16px and never zooms back out. The
+   suite's copy-paste block (Docs_UNI_SIM/new-universal-app.md §5). */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range'])
+       :not([type='color']):not([type='file']):not([type='button'])
+       :not([type='submit']):not([type='reset']),
+  textarea, select { font-size: max(16px, 1em) !important; }
+}
+
+/* ── The canvas ─────────────────────────────────────────────────────────── */
+
+.pt-pixels { display: block; }
+.pt-pixelated canvas { image-rendering: pixelated; }
+
+/* The see-through squares behind the picture. */
+.pt-checker {
+  background-color: #ffffff;
+  background-image: conic-gradient(#e2e8f0 25%, #ffffff 0 50%, #e2e8f0 0 75%, #ffffff 0);
+}
+
+/* The selection's marching ants: two dashed outlines, dark and light, so it
+   shows on any picture. */
+.pt-marquee {
+  outline: 1px dashed #0f172a;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+  animation: pt-ants 0.8s linear infinite;
+}
+.pt-marquee[data-floating='true'] { outline-color: #e05504; }
+@keyframes pt-ants { 50% { outline-color: rgba(15, 23, 42, 0.35); } }
+@media (prefers-reduced-motion: reduce) { .pt-marquee { animation: none; } }
+
+.pt-textbox { caret-color: #e05504; }
+
+.pt-noscrollbar { scrollbar-width: none; }
+.pt-noscrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.pt-btn {
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 150ms, color 150ms, border-color 150ms, opacity 150ms;
+}
+.pt-btn:disabled { opacity: 0.45; cursor: default; }
+.pt-btn-primary { color: #fff; background: linear-gradient(135deg, #fe8c01, #e05504); }
+.pt-btn-primary:not(:disabled):hover { background: #e05504; }
+.pt-btn-ghost { color: #334155; border: 1px solid #cbd5e1; background: #fff; }
+.pt-btn-ghost:not(:disabled):hover { color: #c2410c; border-color: #fb923c; }
+.pt-btn-soft { color: #9a3412; background: rgba(254, 140, 1, 0.12); padding: 0.3rem 0.8rem; font-size: 0.75rem; }
+.pt-btn-soft:hover { background: rgba(254, 140, 1, 0.2); }
+.dark .pt-btn-ghost { color: #e2e8f0; border-color: #475569; background: #0f172a; }
+.dark .pt-btn-ghost:not(:disabled):hover { color: #fdba74; border-color: #fb923c; }
+.dark .pt-btn-soft { color: #fdba74; }
+
+.pt-input {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #fff;
+}
+.pt-input:focus { outline: 2px solid #e05504; outline-offset: 0; border-color: transparent; }
+.dark .pt-input { color: #e6eaf2; background: #0f172a; border-color: #475569; }
+
+.pt-range { accent-color: #e05504; }
+
+.pt-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  text-align: left;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  color: #0f172a;
+  transition: border-color 150ms, background-color 150ms;
+}
+.pt-choice:hover { border-color: #fb923c; background: #fff7ed; }
+.dark .pt-choice { color: #e6eaf2; border-color: #475569; }
+.dark .pt-choice:hover { background: rgba(254, 140, 1, 0.1); }
+
+/* The default opening view (Fit / 100%) wears orange, as every suite view row does. */
+[data-default-view='true'] { color: #c2410c; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
