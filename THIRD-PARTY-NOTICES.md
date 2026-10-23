@@ -31,7 +31,7 @@ Licence: MIT
 
 _Licence text not found in the published package._
 
-## @unisim/sdk 0.202.0
+## @unisim/sdk 0.204.0
 
 Universal Simulation Ltd et al.
 <https://github.com/universal-simulation-ltd/universal-platform>

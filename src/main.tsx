@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { UniversalProvider, type ProductCode } from '@unisim/sdk'
+import { UniversalProvider } from '@unisim/sdk'
 import App from './App'
 import { I18nRoot } from './i18n'
 import './index.css'
@@ -14,23 +14,16 @@ import './index.css'
 // signed out of any suite session the browser holds, and switches the SDK's
 // anonymous daily open count off. No <UsageTracker /> either.
 //
-// ⚠️ `product: 'painter'` and the cast. The suite switcher already lists
-// Painter (@unisim/sdk ≥ 0.201.0), but 'painter' is not yet in the SDK's
-// `ProductCode` union, its `UNIVERSAL_APP_PRODUCTS` list or the platform's
-// `product_code` enum — those three are registered separately. The cast is
-// safe ONLY because this app sends nothing that names its product: there is
-// no session (noAccounts), no usage row and no open count. Remove it the
-// moment `ProductCode` has 'painter', and never copy it into an app that
-// records usage. `cookieDomain` is left unset for the same reason: an app
-// missing from UNIVERSAL_APP_PRODUCTS would otherwise share the Assess suite's
-// language cookie; without a cookie domain the language stays in this
-// browser's own storage, which is what a listed Universal App gets anyway.
+// `product: 'painter'` type-checks because the SDK's `ProductCode` really holds
+// it (@unisim/sdk 0.204.0, with the `product_code` enum value from platform
+// migration 0312). Never cast it: if the type objects, the enum is missing.
 const universalConfig = {
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://rygfxgalojojppxmhddo.supabase.co',
   supabaseAnonKey:
     import.meta.env.VITE_SUPABASE_ANON_KEY ||
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Z2Z4Z2Fsb2pvanBweG1oZGRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NTY4MjUsImV4cCI6MjA5NDMzMjgyNX0.hLy_vt9vY_rdPKF3nL32yAuMCD604E3CH5VM7D7CaNE',
-  product: 'painter' as unknown as ProductCode,
+  product: 'painter' as const,
+  cookieDomain: import.meta.env.PROD ? '.unisim.co.uk' : undefined,
   noAccounts: true,
   openCount: false,
 }
