@@ -9,11 +9,15 @@
 // Kept to a memory budget rather than a step count: forty strokes across a
 // small doodle cost almost nothing, while three rotations of a 12-megapixel
 // photo are 150 MB. The oldest entries go first; the newest always stays.
+//
+// Each entry also carries the OTHER list of movable objects (objects.ts), so
+// undo and redo bring back what could be picked up, not only the pixels.
 import type { Rect } from './pixels'
+import type { Item } from './objects'
 
 export type Entry =
-  | { kind: 'patch'; rect: Rect; data: ImageData }
-  | { kind: 'whole'; canvas: HTMLCanvasElement }
+  | { kind: 'patch'; rect: Rect; data: ImageData; items: Item[] }
+  | { kind: 'whole'; canvas: HTMLCanvasElement; items: Item[] }
 
 export interface Surface {
   canvas: HTMLCanvasElement
@@ -43,19 +47,19 @@ export class History {
     }
   }
 
-  /** Swap the newest entry back in. Returns the surface to show next. */
-  undo(s: Surface): Surface {
+  /** Swap the newest entry back in. Returns the surface and the objects to show next. */
+  undo(s: Surface, items: Item[]): { surface: Surface; items: Item[] } {
     const e = this.undoStack.pop()
-    if (!e) return s
-    const next = swap(e, s)
+    if (!e) return { surface: s, items }
+    const next = swap(e, s, items)
     this.redoStack.push(e)
     return next
   }
 
-  redo(s: Surface): Surface {
+  redo(s: Surface, items: Item[]): { surface: Surface; items: Item[] } {
     const e = this.redoStack.pop()
-    if (!e) return s
-    const next = swap(e, s)
+    if (!e) return { surface: s, items }
+    const next = swap(e, s, items)
     this.undoStack.push(e)
     return next
   }
@@ -76,16 +80,18 @@ export class History {
   }
 }
 
-function swap(e: Entry, s: Surface): Surface {
+function swap(e: Entry, s: Surface, items: Item[]): { surface: Surface; items: Item[] } {
+  const back = e.items
+  e.items = items
   if (e.kind === 'patch') {
     const { x, y, width, height } = e.rect
     const now = s.ctx.getImageData(x, y, width, height)
     s.ctx.putImageData(e.data, x, y)
     e.data = now
-    return s
+    return { surface: s, items: back }
   }
   const now = s.canvas
   const canvas = e.canvas
   e.canvas = now
-  return { canvas, ctx: canvas.getContext('2d', { willReadFrequently: true })! }
+  return { surface: { canvas, ctx: canvas.getContext('2d', { willReadFrequently: true })! }, items: back }
 }

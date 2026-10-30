@@ -20,35 +20,46 @@ export default function OptionsRow() {
   const key = sizeKey(s.tool)
   const under = useUnderTool(s.tool)
 
+  // A box, ellipse or line picked up with Select shows its width and style
+  // here too; changing them restyles it (Editor.tsx).
+  const picked = s.tool === 'select' ? doc.floating?.source.kind : undefined
+  const sizing = key ?? (picked === 'shape' || picked === 'line' ? 'shape' : null)
+  const styling = s.tool === 'box' || s.tool === 'ellipse' || picked === 'shape'
+  const shapeControls = sizing && (
+    <>
+      <label className="flex items-center gap-2">
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('options.size')}</span>
+        <input
+          type="range"
+          min={1}
+          max={SIZE_MAX[sizing]}
+          value={s.sizes[sizing]}
+          onChange={(e) => s.setSize(sizing, Number(e.target.value))}
+          className="pt-range w-28 sm:w-36"
+          aria-valuetext={`${s.sizes[sizing]} ${t('common.px')}`}
+        />
+        <span className="w-12 text-xs tabular-nums text-slate-600 dark:text-slate-300">{s.sizes[sizing]} {t('common.px')}</span>
+      </label>
+      {styling && (
+        <Segmented<ShapeStyle>
+          label={t('options.style')}
+          value={s.shapeStyle}
+          onChange={s.setShapeStyle}
+          options={[
+            { value: 'outline', label: t('options.style_outline') },
+            { value: 'fill', label: t('options.style_fill') },
+            { value: 'both', label: t('options.style_both') },
+          ]}
+        />
+      )}
+    </>
+  )
+
   let context: React.ReactNode = null
   if (key) {
     context = (
       <>
-        <label className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('options.size')}</span>
-          <input
-            type="range"
-            min={1}
-            max={SIZE_MAX[key]}
-            value={s.sizes[key]}
-            onChange={(e) => s.setSize(key, Number(e.target.value))}
-            className="pt-range w-28 sm:w-36"
-            aria-valuetext={`${s.sizes[key]} ${t('common.px')}`}
-          />
-          <span className="w-12 text-xs tabular-nums text-slate-600 dark:text-slate-300">{s.sizes[key]} {t('common.px')}</span>
-        </label>
-        {(s.tool === 'box' || s.tool === 'ellipse') && (
-          <Segmented<ShapeStyle>
-            label={t('options.style')}
-            value={s.shapeStyle}
-            onChange={s.setShapeStyle}
-            options={[
-              { value: 'outline', label: t('options.style_outline') },
-              { value: 'fill', label: t('options.style_fill') },
-              { value: 'both', label: t('options.style_both') },
-            ]}
-          />
-        )}
+        {shapeControls}
         {s.tool === 'eraser' && <Hint>{t('options.eraser_hint')}</Hint>}
       </>
     )
@@ -103,7 +114,8 @@ export default function OptionsRow() {
           <SmallBtn label={t('options.select_all')} onClick={selectAll} />
           {sel && <SmallBtn label={t('options.deselect')} onClick={deselect} />}
         </div>
-        {sel && <Hint>{t('options.move_hint')}</Hint>}
+        {shapeControls}
+        {sel && <Hint>{t(doc.floating ? 'options.object_hint' : 'options.move_hint')}</Hint>}
       </>
     )
   }

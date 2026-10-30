@@ -6,6 +6,7 @@
 // canvas itself when they draw.
 import { History, type Surface } from './history'
 import { makeCanvas, stepDown } from './imageFiles'
+import { capture, contains, intersect, overlaps, render, type Item, type Source } from './objects'
 import { anchorOffset, brightnessContrast, clampRect, greyscale, invert, unionRect, type Rect } from './pixels'
 
 /** Undo memory: generous on a computer, careful on a phone or tablet. */
@@ -15,28 +16,19 @@ function historyBudget(): number {
 }
 
 export interface Floating {
-  /** The lifted (or pasted) pixels. */
+  /** The pixels as they look now. */
   canvas: HTMLCanvasElement
   x: number
   y: number
-  /** Where they were lifted from; null for a paste. */
+  /** Where they were lifted from; null for a paste or a new QR code. */
   from: Rect | null
-  /** A pasted picture (or one picked up again): it is remembered where it lands. */
-  placed?: boolean
+  /** What it is, so a resize or restyle draws it again (objects.ts). */
+  source: Source
+  inner: Rect
 }
 
-/**
- * A pasted picture after it was put down, so a click on it with Select picks
- * the whole picture up again. `under` is what it covered, put back when it is
- * picked up, so moving it later leaves no hole.
- */
-export interface Placed {
-  rect: Rect
-  under: HTMLCanvasElement
-}
-
-/** How many put-down pastes are remembered; the oldest is forgotten first. */
-const MAX_PLACED = 12
+/** How many objects stay movable; the oldest becomes plain paint first. */
+const MAX_ITEMS = 100
 
 type Listener = () => void
 
@@ -51,13 +43,15 @@ class PaintDoc {
   floating: Floating | null = null
   /** The blank canvas Painter opens on, untouched: a picture opened now replaces it. */
   starter = false
-  /** Pastes that have been put down, newest last. */
-  placed: Placed[] = []
+  /** The movable objects on the picture, oldest first (objects.ts). */
+  items: Item[] = []
 
   private history = new History(historyBudget())
   /** A copy of the picture as it was when the current edit began. */
   private base: HTMLCanvasElement | null = null
   private editing = false
+  /** The objects as they were when the current edit began, kept with its undo step. */
+  private itemsAtBegin: Item[] = []
   private listeners = new Set<Listener>()
 
   get canvas() { return this.surface?.canvas ?? null }
@@ -83,7 +77,7 @@ class PaintDoc {
   load(canvas: HTMLCanvasElement, stem: string) {
     this.history.clear()
     this.floating = null
-    this.forgetPlaced()
+    this.items = []
     this.starter = false
     this.editing = false
     this.releaseBase()
@@ -108,7 +102,7 @@ class PaintDoc {
     this.history.clear()
     this.releaseBase()
     this.floating = null
-    this.forgetPlaced()
+    this.items = []
     this.starter = false
     if (this.surface) {
       this.surface.canvas.width = 0
@@ -146,6 +140,7 @@ class PaintDoc {
     const b = this.base.getContext('2d')!
     b.clearRect(0, 0, this.base.width, this.base.height)
     b.drawImage(s.canvas, 0, 0)
+    this.itemsAtBegin = this.items
     this.editing = true
   }
 
@@ -157,39 +152,130 @@ class PaintDoc {
     s.ctx.globalCompositeOperation = 'copy'
     s.ctx.drawImage(this.base, 0, 0)
     s.ctx.restore()
+    this.items = this.itemsAtBegin
     this.editing = false
     this.changed(false)
   }
 
-  /** Finish an edit that changed `rect` (or nothing, with null). */
-  commit(rect: Rect | null) {
+  /**
+   * Finish an edit that changed `rect` (or nothing, with null). `add` puts a
+   * new object down; `keep` says the objects were already seen to (picking
+   * one up, or dropping one). Otherwise this was paint, and any object it
+   * changed a pixel of becomes paint too.
+   */
+  commit(rect: Rect | null, opts: { add?: Item; keep?: boolean } = {}) {
     const s = this.surface
     if (!s || !this.editing || !this.base) return
     this.editing = false
+    const before = this.itemsAtBegin
     const r = rect && clampRect(rect, s.canvas.width, s.canvas.height)
     if (!r) { this.changed(false); return }
+    if (opts.add) this.items = [...this.items, opts.add].slice(-MAX_ITEMS)
+    else if (!opts.keep) this.items = this.bakeTouched(this.items, r)
     const data = this.base.getContext('2d', { willReadFrequently: true })!.getImageData(r.x, r.y, r.width, r.height)
-    this.history.push({ kind: 'patch', rect: r, data })
+    this.history.push({ kind: 'patch', rect: r, data, items: before })
     this.changed()
   }
 
   get isEditing() { return this.editing }
 
-  /**
-   * Draw the newest edit again, differently, in its place: put back what it
-   * covered, run `draw`, and keep the result as that same one undo step. For
-   * a shape restyled straight after it was drawn. The caller makes sure the
-   * newest edit really is the one being redrawn (nothing has happened since).
-   */
-  amendLast(draw: (ctx: CanvasRenderingContext2D) => Rect): boolean {
+  // ── Movable objects (objects.ts) ─────────────────────────────────────────
+
+  /** Put a new object down: a box, ellipse, line or text, as one undo step. */
+  placeItem(source: Source, inner: Rect) {
     const s = this.surface
-    if (!s || this.floating || this.editing || !this.history.canUndo) return false
-    // A patch swaps back in place, so the surface stays the same canvas; the
-    // undone entry sits on the redo stack until commit() pushes and clears it.
-    this.surface = this.history.undo(s)
+    if (!s) return
+    this.settle()
     this.begin()
-    this.commit(draw(this.surface.ctx))
+    const { canvas, rect } = render(source, inner)
+    const under = capture(s.canvas, rect)
+    s.ctx.drawImage(canvas, rect.x, rect.y)
+    this.commit(rect, { add: { source, inner, rect, pixels: canvas, under } })
+  }
+
+  /**
+   * Draw the newest object again with `source` (a shape restyled straight
+   * after it was drawn), as that same one undo step. The caller makes sure
+   * nothing has happened since it was drawn.
+   */
+  amendLast(source: Source): boolean {
+    const s = this.surface
+    const last = this.items[this.items.length - 1]
+    if (!s || !last || this.floating || this.editing || !this.history.canUndo) return false
+    const back = this.history.undo(s, this.items)
+    this.surface = back.surface
+    this.items = back.items
+    // placeItem's commit pushes a new step, which clears the undone one from redo.
+    this.placeItem(source, last.inner)
     return true
+  }
+
+  /** The newest object under (x, y), or -1. */
+  itemAt(x: number, y: number): number {
+    for (let i = this.items.length - 1; i >= 0; i--) if (contains(this.items[i].rect, x, y)) return i
+    return -1
+  }
+
+  /**
+   * Pick an object up again, whole, putting back what it covered. Objects put
+   * down after it are taken off first and put back after, so one lying across
+   * it is not wiped where they overlap.
+   */
+  liftItem(index: number): Floating | null {
+    const s = this.surface
+    const item = this.items[index]
+    if (!s || !item || this.floating) return null
+    this.begin()
+    const all = this.items
+    for (let j = all.length - 1; j >= index; j--) putBack(s.ctx, all[j])
+    const kept = all.slice(0, index)
+    for (const later of all.slice(index + 1)) {
+      kept.push({ ...later, under: capture(s.canvas, later.rect) })
+      s.ctx.drawImage(later.pixels, later.rect.x, later.rect.y)
+    }
+    this.items = kept
+    this.floating = { canvas: item.pixels, x: item.rect.x, y: item.rect.y, from: item.rect, source: item.source, inner: item.inner }
+    this.changed(false)
+    return this.floating
+  }
+
+  /** Draw the floating object again at a new size or in a new style. */
+  reshapeFloating(source: Source, inner: Rect) {
+    const f = this.floating
+    if (!f) return
+    const { canvas, rect } = render(source, inner)
+    this.floating = { ...f, canvas, x: rect.x, y: rect.y, source, inner }
+    this.changed(false)
+  }
+
+  /**
+   * Objects whose pixels the edit just committed changed, and the older ones
+   * they lie on: they are paint now. (An older one's `under` no longer tells
+   * what is beneath a newer one that has become paint on top of it.)
+   */
+  private bakeTouched(items: Item[], r: Rect): Item[] {
+    const s = this.surface
+    if (!s || !this.base || !items.length) return items
+    const bctx = this.base.getContext('2d', { willReadFrequently: true })!
+    const baked = new Set<number>()
+    items.forEach((it, i) => {
+      const x = intersect(it.rect, r)
+      if (!x) return
+      const a = new Uint32Array(bctx.getImageData(x.x, x.y, x.width, x.height).data.buffer)
+      const b = new Uint32Array(s.ctx.getImageData(x.x, x.y, x.width, x.height).data.buffer)
+      for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) { baked.add(i); return }
+    })
+    return this.withBaked(items, baked)
+  }
+
+  /** `items` less those in `baked` and every older one lying under them. */
+  private withBaked(items: Item[], baked: Set<number>): Item[] {
+    if (!baked.size) return items
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (!baked.has(i)) continue
+      for (let j = 0; j < i; j++) if (overlaps(items[j].rect, items[i].rect)) baked.add(j)
+    }
+    return items.filter((_, i) => !baked.has(i))
   }
 
   // ── Edits that replace the whole picture (resize, rotate, crop, adjust) ──
@@ -198,9 +284,9 @@ class PaintDoc {
   replace(next: HTMLCanvasElement) {
     const s = this.surface
     if (!s) return
-    this.history.push({ kind: 'whole', canvas: s.canvas })
-    // Resized, rotated or cropped: the pastes are no longer where they were.
-    this.forgetPlaced()
+    this.history.push({ kind: 'whole', canvas: s.canvas, items: this.items })
+    // Resized, rotated or cropped: the objects are paint now (undo brings them back).
+    this.items = []
     this.surface = { canvas: next, ctx: next.getContext('2d', { willReadFrequently: true })! }
     this.changed()
   }
@@ -304,8 +390,12 @@ class PaintDoc {
     this.begin()
     const c = makeCanvas(r.width, r.height)
     c.getContext('2d')!.drawImage(s.canvas, r.x, r.y, r.width, r.height, 0, 0, r.width, r.height)
-    if (!copy) s.ctx.clearRect(r.x, r.y, r.width, r.height)
-    this.floating = { canvas: c, x: r.x, y: r.y, from: r }
+    if (!copy) {
+      s.ctx.clearRect(r.x, r.y, r.width, r.height)
+      // Objects partly lifted are paint now: their pixels went with the lift.
+      this.items = this.withBaked(this.items, new Set(this.items.flatMap((it, i) => (overlaps(it.rect, r) ? [i] : []))))
+    }
+    this.floating = { canvas: c, x: r.x, y: r.y, from: r, source: { kind: 'image', canvas: c }, inner: r }
     this.changed(false)
     return this.floating
   }
@@ -322,73 +412,39 @@ class PaintDoc {
     }
     this.begin()
     this.starter = false
-    this.floating = { canvas, x: Math.round(x), y: Math.round(y), from: null, placed: true }
+    const inner = { x: Math.round(x), y: Math.round(y), width: canvas.width, height: canvas.height }
+    this.floating = { canvas, x: inner.x, y: inner.y, from: null, source: { kind: 'image', canvas }, inner }
     this.changed(false)
-  }
-
-  /** The newest put-down paste under (x, y), or -1. */
-  placedAt(x: number, y: number): number {
-    for (let i = this.placed.length - 1; i >= 0; i--) {
-      const r = this.placed[i].rect
-      if (x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height) return i
-    }
-    return -1
-  }
-
-  /** Pick a put-down paste up again, whole, putting back what it covered. */
-  liftPlaced(index: number): Floating | null {
-    const s = this.surface
-    const p = this.placed[index]
-    if (!s || !p || this.floating) return null
-    this.placed.splice(index, 1)
-    const { x, y, width, height } = p.rect
-    this.begin()
-    const c = makeCanvas(width, height)
-    c.getContext('2d')!.drawImage(s.canvas, x, y, width, height, 0, 0, width, height)
-    s.ctx.clearRect(x, y, width, height)
-    s.ctx.drawImage(p.under, x, y)
-    p.under.width = 0
-    p.under.height = 0
-    this.floating = { canvas: c, x, y, from: p.rect, placed: true }
-    this.changed(false)
-    return this.floating
   }
 
   moveFloating(x: number, y: number) {
-    if (!this.floating) return
-    this.floating.x = Math.round(x)
-    this.floating.y = Math.round(y)
+    const f = this.floating
+    if (!f) return
+    const dx = Math.round(x) - f.x, dy = Math.round(y) - f.y
+    f.x += dx
+    f.y += dy
+    f.inner = { ...f.inner, x: f.inner.x + dx, y: f.inner.y + dy }
     this.changed(false)
   }
 
-  /** Put the floating pixels down where they are, as one undoable step. */
+  /** Put the floating object down where it is, as one undoable step. It stays movable. */
   settle() {
     const f = this.floating
     const s = this.surface
     if (!f || !s) return
     this.floating = null
     const to = { x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height }
-    if (f.placed) {
-      // Keep what the paste is about to cover, before it covers it.
-      const under = makeCanvas(to.width, to.height)
-      under.getContext('2d')!.drawImage(s.canvas, -to.x, -to.y)
-      this.placed.push({ rect: to, under })
-      while (this.placed.length > MAX_PLACED) this.dropPlaced(0)
-    }
+    const under = capture(s.canvas, to)
     s.ctx.drawImage(f.canvas, f.x, f.y)
-    f.canvas.width = 0
-    f.canvas.height = 0
-    this.commit(unionRect(f.from, to))
+    this.commit(unionRect(f.from, to), { add: { source: f.source, inner: f.inner, rect: to, pixels: f.canvas, under } })
   }
 
-  /** Drop the floating pixels: a lifted area stays cleared, a paste vanishes. */
+  /** Drop the floating object: what it was lifted from stays as it is now, a paste vanishes. */
   discardFloating() {
     const f = this.floating
     if (!f) return
     this.floating = null
-    f.canvas.width = 0
-    f.canvas.height = 0
-    this.commit(f.from)
+    this.commit(f.from, { keep: true })
   }
 
   // ── Undo / redo ───────────────────────────────────────────────────────────
@@ -396,17 +452,17 @@ class PaintDoc {
   undo() {
     if (!this.surface) return
     if (this.floating) this.settle()
-    // Undo can take a paste away (or bring one back): forget them all rather
-    // than offer to pick up pixels that are no longer a paste.
-    this.forgetPlaced()
-    this.surface = this.history.undo(this.surface)
+    const back = this.history.undo(this.surface, this.items)
+    this.surface = back.surface
+    this.items = back.items
     this.changed()
   }
 
   redo() {
     if (!this.surface || this.floating) return
-    this.forgetPlaced()
-    this.surface = this.history.redo(this.surface)
+    const next = this.history.redo(this.surface, this.items)
+    this.surface = next.surface
+    this.items = next.items
     this.changed()
   }
 
@@ -447,15 +503,6 @@ class PaintDoc {
     this.commit(rect)
   }
 
-  private dropPlaced(index: number) {
-    const [p] = this.placed.splice(index, 1)
-    if (p) { p.under.width = 0; p.under.height = 0 }
-  }
-
-  private forgetPlaced() {
-    while (this.placed.length) this.dropPlaced(0)
-  }
-
   private releaseBase() {
     if (this.base) { this.base.width = 0; this.base.height = 0 }
     this.base = null
@@ -466,4 +513,10 @@ export const doc = new PaintDoc()
 
 if (import.meta.env?.DEV && typeof window !== 'undefined') {
   ;(window as unknown as { __painterDoc: PaintDoc }).__painterDoc = doc
+}
+
+/** Take an object off the canvas: what it covered goes back. */
+function putBack(ctx: CanvasRenderingContext2D, it: Item) {
+  ctx.clearRect(it.rect.x, it.rect.y, it.rect.width, it.rect.height)
+  ctx.drawImage(it.under, it.rect.x, it.rect.y)
 }

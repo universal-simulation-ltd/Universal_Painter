@@ -8,7 +8,8 @@
 // lifts — one undo step per gesture.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { doc } from '../lib/doc'
-import { brushLine, drawLine, drawShape, drawText, fontFor, LINE_HEIGHT, pencilLine, type ShapeInk } from '../lib/draw'
+import { brushLine, drawLine, drawShape, fontFor, LINE_HEIGHT, pencilLine, type ShapeInk } from '../lib/draw'
+import { contains, resized, textInner, type Source } from '../lib/objects'
 import { floodFill, parseHex, rectFromPoints, snap45, squareUp, toHex, unionRect, type Rect } from '../lib/pixels'
 import { showOpening, viewport, zoomBy } from '../lib/actions'
 import { usePaintStore, type Tool } from '../stores/paintStore'
@@ -22,6 +23,8 @@ type Gesture =
   | { kind: 'shape'; id: number; tool: ShapeTool; start: Pt; end: Pt; ink: ShapeInk; swapped: boolean; shown: Rect | null }
   | { kind: 'select'; id: number; start: Pt }
   | { kind: 'move'; id: number; grab: Pt; origin: Pt }
+  /** A corner handle of the selected object: 0 top-left, 1 top-right, 2 bottom-right, 3 bottom-left. */
+  | { kind: 'resize'; id: number; corner: number; source: Source; inner: Rect }
   | { kind: 'pan'; id: number; from: Pt; panX: number; panY: number }
   | { kind: 'pinch'; ids: [number, number]; dist: number; mid: Pt; zoom: number; panX: number; panY: number }
 
@@ -35,7 +38,39 @@ type ShapeTool = 'line' | 'box' | 'ellipse'
  * or a colour redraws it that way instead of only the next one, as one undo
  * step (James, 2026-10-30: "box filled, then click outline").
  */
-interface LastShape { gesture: Extract<Gesture, { kind: 'shape' }>; shift: boolean; version: number }
+interface LastShape { tool: ShapeTool; version: number }
+
+/** The object a finished shape gesture leaves: whole pixels, Shift's square or 45° applied. */
+function shapeObject(g: Extract<Gesture, { kind: 'shape' }>, shift: boolean): { source: Source; inner: Rect } {
+  const a = { x: Math.round(g.start.x), y: Math.round(g.start.y) }
+  const raw = g.tool === 'line'
+    ? (shift ? snap45(g.start.x, g.start.y, g.end.x, g.end.y) : g.end)
+    : (shift ? squareUp(g.start.x, g.start.y, g.end.x, g.end.y) : g.end)
+  const b = { x: Math.round(raw.x), y: Math.round(raw.y) }
+  const inner = rectFromPoints(a.x, a.y, b.x, b.y)
+  if (g.tool === 'line') return { source: { kind: 'line', ink: g.ink, fromRight: a.x > b.x, fromBottom: a.y > b.y }, inner }
+  return { source: { kind: 'shape', tool: g.tool, ink: g.ink }, inner }
+}
+
+/**
+ * A changed shape style, line width or colour, applied to an object's own
+ * look: only what changed, so selecting a red box and picking a new width
+ * leaves it red.
+ */
+function restyled(source: Source, s: ReturnType<typeof usePaintStore.getState>, prev: ReturnType<typeof usePaintStore.getState>): Source | null {
+  if (source.kind === 'image') return null
+  if (source.kind === 'text') return s.primary !== prev.primary ? { ...source, colour: s.primary } : null
+  const ink = { ...source.ink }
+  if (source.kind === 'shape' && s.shapeStyle !== prev.shapeStyle) ink.style = s.shapeStyle
+  if (s.sizes.shape !== prev.sizes.shape) ink.width = s.sizes.shape
+  if (s.primary !== prev.primary) ink.primary = s.primary
+  if (s.secondary !== prev.secondary) ink.secondary = s.secondary
+  const same = ink.style === source.ink.style && ink.width === source.ink.width && ink.primary === source.ink.primary && ink.secondary === source.ink.secondary
+  return same ? null : { ...source, ink }
+}
+
+/** How near a corner handle a press has to land, in screen pixels. */
+const HANDLE_REACH = { mouse: 9, touch: 22 }
 
 /** The ink a shape is drawn with; a right-button shape swaps the two colours. */
 function inkFor(s: ReturnType<typeof usePaintStore.getState>, tool: ShapeTool, swapped: boolean): ShapeInk {
@@ -141,9 +176,11 @@ export default function Editor() {
     setTextBox(null)
     if (!box || !box.value.trim() || !doc.surface) return
     const s = usePaintStore.getState()
-    doc.begin()
-    const r = drawText(doc.surface.ctx, box.value, box.x, box.y, s.fontSize, s.bold, s.primary)
-    doc.commit(r)
+    // Text is an object: Select can pick it up, move it and resize it.
+    doc.placeItem(
+      { kind: 'text', value: box.value, size: s.fontSize, bold: s.bold, colour: s.primary },
+      textInner(box.value, s.fontSize, s.bold, box.x, box.y),
+    )
   }, [])
   useEffect(() => { if (tool !== 'text') commitText() }, [tool, commitText])
   useLayoutEffect(() => {
@@ -175,16 +212,48 @@ export default function Editor() {
     return drawShape(ctx, g.tool, rectFromPoints(g.start.x, g.start.y, end.x, end.y), g.ink)
   }
 
-  // The shape just drawn follows a change of style, width or colour.
+  // A change of style, width or colour restyles the selected object, or the
+  // shape just drawn.
   const lastShape = useRef<LastShape | null>(null)
   useEffect(() => usePaintStore.subscribe((s, prev) => {
+    const f = doc.floating
+    if (f) {
+      const next = restyled(f.source, s, prev)
+      if (next) doc.reshapeFloating(next, f.inner)
+      return
+    }
     const last = lastShape.current
     if (!last) return
-    if (s.tool !== last.gesture.tool || doc.version !== last.version) { lastShape.current = null; return }
-    if (s.shapeStyle === prev.shapeStyle && s.sizes.shape === prev.sizes.shape && s.primary === prev.primary && s.secondary === prev.secondary) return
-    const g = { ...last.gesture, ink: inkFor(s, last.gesture.tool, last.gesture.swapped) }
-    if (doc.amendLast((ctx) => drawShapeTo(ctx, g, last.shift))) lastShape.current = { ...last, gesture: g, version: doc.version }
-  }), []) // eslint-disable-line react-hooks/exhaustive-deps
+    const item = doc.items[doc.items.length - 1]
+    if (s.tool !== last.tool || doc.version !== last.version || !item) { lastShape.current = null; return }
+    const next = restyled(item.source, s, prev)
+    if (next && doc.amendLast(next)) lastShape.current = { ...last, version: doc.version }
+  }), [])
+
+  /** Pick up object `i` with Select, and set the style controls to match it. */
+  const pickUp = (i: number) => {
+    const f = doc.liftItem(i)
+    if (!f) return null
+    const s = usePaintStore.getState()
+    s.setSelection({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })
+    // Only the shape style and width: the colours stay the person's own.
+    if (f.source.kind === 'shape') s.setShapeStyle(f.source.ink.style)
+    if (f.source.kind === 'shape' || f.source.kind === 'line') s.setSize('shape', f.source.ink.width)
+    return f
+  }
+
+  /** The corner handle of the floating object under a screen point, or -1. */
+  const handleAt = (clientX: number, clientY: number, pointerType: string): number => {
+    const f = doc.floating
+    if (!f || usePaintStore.getState().tool !== 'select') return -1
+    const at = local(clientX, clientY)
+    const { zoom, panX, panY } = usePaintStore.getState()
+    const reach = pointerType === 'mouse' ? HANDLE_REACH.mouse : HANDLE_REACH.touch
+    const corners = [
+      [f.x, f.y], [f.x + f.canvas.width, f.y], [f.x + f.canvas.width, f.y + f.canvas.height], [f.x, f.y + f.canvas.height],
+    ]
+    return corners.findIndex(([cx, cy]) => Math.abs(panX + cx * zoom - at.x) <= reach && Math.abs(panY + cy * zoom - at.y) <= reach)
+  }
 
   // ── Pointer handling ───────────────────────────────────────────────────
   const widthFor = (e: PointerEvent | React.PointerEvent, size: number) => {
@@ -296,6 +365,11 @@ export default function Editor() {
         const f = doc.floating
         const sel = s.selection
         const inside = (r: Rect) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.width && p.y <= r.y + r.height
+        const corner = handleAt(e.clientX, e.clientY, e.pointerType)
+        if (f && corner >= 0) {
+          gesture.current = { kind: 'resize', id: e.pointerId, corner, source: f.source, inner: f.inner }
+          return
+        }
         if (f && inside({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })) {
           gesture.current = { kind: 'move', id: e.pointerId, grab: p, origin: { x: f.x, y: f.y } }
           return
@@ -308,12 +382,11 @@ export default function Editor() {
           }
         }
         if (f) doc.settle()
-        // A paste that was put down: a click on it picks the whole picture up
-        // again, ready to drag.
-        const hit = doc.placedAt(p.x, p.y)
-        const again = hit >= 0 ? doc.liftPlaced(hit) : null
+        // An object (a box, a line, text, a paste): a click picks the whole of
+        // it up, with corner handles to resize it, ready to drag.
+        const hit = doc.itemAt(p.x, p.y)
+        const again = hit >= 0 ? pickUp(hit) : null
         if (again) {
-          s.setSelection({ x: again.x, y: again.y, width: again.canvas.width, height: again.canvas.height })
           gesture.current = { kind: 'move', id: e.pointerId, grab: p, origin: { x: again.x, y: again.y } }
           return
         }
@@ -387,6 +460,15 @@ export default function Editor() {
       doc.moveFloating(nx, ny)
       const f = doc.floating
       if (f) s.setSelection({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })
+      return
+    }
+    if (g.kind === 'resize') {
+      // Always from the object as it was when the handle was grabbed, so text
+      // sizes and rounding never compound.
+      const next = resized(g.source, g.inner, g.corner, p.x, p.y, e.shiftKey)
+      doc.reshapeFloating(next.source, next.inner)
+      const f = doc.floating
+      if (f) s.setSelection({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })
     }
   }
 
@@ -396,12 +478,15 @@ export default function Editor() {
     if (!el || e.pointerType !== 'mouse' || !doc.surface) return
     const s = usePaintStore.getState()
     let movable = false
+    let corner = -1
     if (s.tool === 'select') {
       const p = toDoc(e.clientX, e.clientY)
       const sel = s.selection
-      movable = (!!sel && p.x >= sel.x && p.y >= sel.y && p.x <= sel.x + sel.width && p.y <= sel.y + sel.height) || doc.placedAt(p.x, p.y) >= 0
+      corner = handleAt(e.clientX, e.clientY, e.pointerType)
+      movable = (!!sel && contains(sel, p.x, p.y)) || doc.itemAt(p.x, p.y) >= 0
     }
     el.dataset.movable = movable ? 'true' : ''
+    el.dataset.handle = corner < 0 ? '' : corner % 2 === 0 ? 'nwse' : 'nesw'
   }
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -425,10 +510,10 @@ export default function Editor() {
     } else if (g.kind === 'shape') {
       clearPreview(g.shown)
       if (g.start.x === g.end.x && g.start.y === g.end.y) return
-      doc.begin()
-      const r = drawShapeTo(doc.surface.ctx, g, e.shiftKey)
-      doc.commit(r)
-      lastShape.current = { gesture: g, shift: e.shiftKey, version: doc.version }
+      // Shapes are objects: Select can pick one up, move it and resize it.
+      const made = shapeObject(g, e.shiftKey)
+      doc.placeItem(made.source, made.inner)
+      lastShape.current = { tool: g.tool, version: doc.version }
     }
   }
 
@@ -529,6 +614,17 @@ export default function Editor() {
           }}
           data-floating={floating ? 'true' : undefined}
         />
+      )}
+      {selection && floating && tool === 'select' && (
+        [[0, 0], [1, 0], [1, 1], [0, 1]].map(([cx, cy], i) => (
+          <div
+            key={i}
+            aria-hidden="true"
+            data-handle-corner={i}
+            className="pt-handle pointer-events-none absolute"
+            style={{ left: panX + (selection.x + cx * selection.width) * zoom, top: panY + (selection.y + cy * selection.height) * zoom }}
+          />
+        ))
       )}
 
       {textBox && (

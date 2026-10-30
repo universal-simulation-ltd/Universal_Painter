@@ -19,9 +19,12 @@ Live at **[opensource.unisim.co.uk/painter](https://opensource.unisim.co.uk/pain
   both), text, colour picker, and a first and second colour (each opens the
   system colour picker), with a swap, next to the tools.
 - **Select** a rectangle to move it (Alt/Option moves a copy), copy, cut,
-  delete or **crop to it**. Paste a picture onto the canvas and move it into
-  place; click away, and a click on it with Select picks the whole picture up
-  again (what it covered is put back).
+  delete or **crop to it**.
+- **Objects stay movable.** Boxes, ellipses, lines, text, pastes and QR codes
+  can be clicked with Select later, moved, resized from the corner handles
+  (pictures and text keep their proportions; Shift changes that), and
+  restyled (shape style, line width, colour). One painted over with the pencil,
+  brush, eraser or fill becomes paint, as in Paint. Undo keeps them movable.
 - **QR codes:** type a link and a QR code lands on the canvas like a paste,
   drawn by the suite's shared `@unisim/qr` (as in Universal QR and PDF).
 - **The whole picture:** resize it (by percentage or pixels), change the canvas
