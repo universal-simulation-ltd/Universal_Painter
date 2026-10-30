@@ -112,3 +112,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+/* The canvas cursor: the tool's own, or "move" over something Select can drag. */
+.pt-viewport { cursor: var(--pt-cursor, default); }
+.pt-viewport[data-movable='true'] { cursor: move; }

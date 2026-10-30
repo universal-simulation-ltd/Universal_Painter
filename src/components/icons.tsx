@@ -29,6 +29,7 @@ export const UndoIcon = () => <Svg><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a
 export const RedoIcon = () => <Svg><path d="M15 14l5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></Svg>
 export const SaveIcon = () => <Svg><path d="M12 4v11" /><path d="M7.5 10.5L12 15l4.5-4.5" /><path d="M5 19.5h14" /></Svg>
 export const PictureIcon = () => <Svg><rect x="3.5" y="5" width="17" height="14" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="M20.5 16l-5-5-8.5 8" /></Svg>
+export const QrIcon = () => <Svg><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h2.5v2.5H14zM17.5 17.5H20V20h-2.5zM14 20h1M20 14v1" /></Svg>
 export const SwapIcon = () => <Svg size={16}><path d="M7 4L4 7l3 3" /><path d="M4 7h11a4 4 0 0 1 4 4" /><path d="M17 20l3-3-3-3" /><path d="M20 17H9a4 4 0 0 1-4-4" /></Svg>
 export const PlusIcon = () => <Svg size={18}><path d="M12 5v14M5 12h14" /></Svg>
 export const MinusIcon = () => <Svg size={18}><path d="M5 12h14" /></Svg>

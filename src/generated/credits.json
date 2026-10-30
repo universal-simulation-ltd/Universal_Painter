@@ -1,8 +1,8 @@
 {
   "app": "universal-painter",
-  "appVersion": "0.1.2",
-  "generated": "2026-10-23",
-  "noticesCount": 11,
+  "appVersion": "0.2.0",
+  "generated": "2026-10-30",
+  "noticesCount": 12,
   "ships": [
     {
       "name": "heic-to",
@@ -13,6 +13,18 @@
       "description": "opens iPhone HEIC photos",
       "authors": [
         "Hopper Gee"
+      ],
+      "source": "node_modules"
+    },
+    {
+      "name": "qr-code-styling",
+      "version": "1.9.2",
+      "licence": "MIT",
+      "repo": "https://github.com/kozakdenys/qr-code-styling",
+      "homepage": "https://qr-code-styling.com",
+      "description": "draws the styled QR codes",
+      "authors": [
+        "Denys Kozak"
       ],
       "source": "node_modules"
     },

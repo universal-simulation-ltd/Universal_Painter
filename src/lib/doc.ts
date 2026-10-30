@@ -21,7 +21,22 @@ export interface Floating {
   y: number
   /** Where they were lifted from; null for a paste. */
   from: Rect | null
+  /** A pasted picture (or one picked up again): it is remembered where it lands. */
+  placed?: boolean
 }
+
+/**
+ * A pasted picture after it was put down, so a click on it with Select picks
+ * the whole picture up again. `under` is what it covered, put back when it is
+ * picked up, so moving it later leaves no hole.
+ */
+export interface Placed {
+  rect: Rect
+  under: HTMLCanvasElement
+}
+
+/** How many put-down pastes are remembered; the oldest is forgotten first. */
+const MAX_PLACED = 12
 
 type Listener = () => void
 
@@ -34,6 +49,10 @@ class PaintDoc {
   /** Moves each time a different picture is loaded, so the editor can frame it. */
   loads = 0
   floating: Floating | null = null
+  /** The blank canvas Painter opens on, untouched: a picture opened now replaces it. */
+  starter = false
+  /** Pastes that have been put down, newest last. */
+  placed: Placed[] = []
 
   private history = new History(historyBudget())
   /** A copy of the picture as it was when the current edit began. */
@@ -54,7 +73,7 @@ class PaintDoc {
   getVersion = () => this.version
 
   private changed(dirty = true) {
-    if (dirty) this.dirty = true
+    if (dirty) { this.dirty = true; this.starter = false }
     this.version++
     for (const l of this.listeners) l()
   }
@@ -64,6 +83,8 @@ class PaintDoc {
   load(canvas: HTMLCanvasElement, stem: string) {
     this.history.clear()
     this.floating = null
+    this.forgetPlaced()
+    this.starter = false
     this.editing = false
     this.releaseBase()
     this.surface = { canvas, ctx: canvas.getContext('2d', { willReadFrequently: true })! }
@@ -87,12 +108,22 @@ class PaintDoc {
     this.history.clear()
     this.releaseBase()
     this.floating = null
+    this.forgetPlaced()
+    this.starter = false
     if (this.surface) {
       this.surface.canvas.width = 0
       this.surface.canvas.height = 0
     }
     this.surface = null
     this.dirty = false
+    this.changed(false)
+  }
+
+  /** A new name for the picture (the title in the bar); used when it is saved. */
+  rename(stem: string) {
+    const next = stem.trim()
+    if (!next || next === this.stem) return
+    this.stem = next
     this.changed(false)
   }
 
@@ -151,6 +182,8 @@ class PaintDoc {
     const s = this.surface
     if (!s) return
     this.history.push({ kind: 'whole', canvas: s.canvas })
+    // Resized, rotated or cropped: the pastes are no longer where they were.
+    this.forgetPlaced()
     this.surface = { canvas: next, ctx: next.getContext('2d', { willReadFrequently: true })! }
     this.changed()
   }
@@ -271,8 +304,37 @@ class PaintDoc {
       y = 0
     }
     this.begin()
-    this.floating = { canvas, x: Math.round(x), y: Math.round(y), from: null }
+    this.starter = false
+    this.floating = { canvas, x: Math.round(x), y: Math.round(y), from: null, placed: true }
     this.changed(false)
+  }
+
+  /** The newest put-down paste under (x, y), or -1. */
+  placedAt(x: number, y: number): number {
+    for (let i = this.placed.length - 1; i >= 0; i--) {
+      const r = this.placed[i].rect
+      if (x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height) return i
+    }
+    return -1
+  }
+
+  /** Pick a put-down paste up again, whole, putting back what it covered. */
+  liftPlaced(index: number): Floating | null {
+    const s = this.surface
+    const p = this.placed[index]
+    if (!s || !p || this.floating) return null
+    this.placed.splice(index, 1)
+    const { x, y, width, height } = p.rect
+    this.begin()
+    const c = makeCanvas(width, height)
+    c.getContext('2d')!.drawImage(s.canvas, x, y, width, height, 0, 0, width, height)
+    s.ctx.clearRect(x, y, width, height)
+    s.ctx.drawImage(p.under, x, y)
+    p.under.width = 0
+    p.under.height = 0
+    this.floating = { canvas: c, x, y, from: p.rect, placed: true }
+    this.changed(false)
+    return this.floating
   }
 
   moveFloating(x: number, y: number) {
@@ -288,8 +350,15 @@ class PaintDoc {
     const s = this.surface
     if (!f || !s) return
     this.floating = null
-    s.ctx.drawImage(f.canvas, f.x, f.y)
     const to = { x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height }
+    if (f.placed) {
+      // Keep what the paste is about to cover, before it covers it.
+      const under = makeCanvas(to.width, to.height)
+      under.getContext('2d')!.drawImage(s.canvas, -to.x, -to.y)
+      this.placed.push({ rect: to, under })
+      while (this.placed.length > MAX_PLACED) this.dropPlaced(0)
+    }
+    s.ctx.drawImage(f.canvas, f.x, f.y)
     f.canvas.width = 0
     f.canvas.height = 0
     this.commit(unionRect(f.from, to))
@@ -310,12 +379,16 @@ class PaintDoc {
   undo() {
     if (!this.surface) return
     if (this.floating) this.settle()
+    // Undo can take a paste away (or bring one back): forget them all rather
+    // than offer to pick up pixels that are no longer a paste.
+    this.forgetPlaced()
     this.surface = this.history.undo(this.surface)
     this.changed()
   }
 
   redo() {
     if (!this.surface || this.floating) return
+    this.forgetPlaced()
     this.surface = this.history.redo(this.surface)
     this.changed()
   }
@@ -355,6 +428,15 @@ class PaintDoc {
     this.begin()
     s.ctx.clearRect(rect.x, rect.y, rect.width, rect.height)
     this.commit(rect)
+  }
+
+  private dropPlaced(index: number) {
+    const [p] = this.placed.splice(index, 1)
+    if (p) { p.under.width = 0; p.under.height = 0 }
+  }
+
+  private forgetPlaced() {
+    while (this.placed.length) this.dropPlaced(0)
   }
 
   private releaseBase() {

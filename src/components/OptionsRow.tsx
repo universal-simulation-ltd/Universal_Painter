@@ -1,11 +1,14 @@
 // The second row: what the chosen tool can be set to, then the two colours and
 // the palette. A swatch tap sets the first colour; a right-click or a long
 // press sets the second, as in Paint.
-import { useRef, useSyncExternalStore } from 'react'
+//
+// The tool's options start under the tool's own button (James, 2026-10-30),
+// slid back left only as far as they need to fit.
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { doc } from '../lib/doc'
 import { copySelection, cropToSelection, cutSelection, deleteSelection, deselect, pasteFromButton, selectAll } from '../lib/actions'
 import { useScrollHint } from '../lib/scrollRow'
-import { PALETTE, sizeKey, usePaintStore, type ShapeStyle } from '../stores/paintStore'
+import { PALETTE, sizeKey, usePaintStore, type ShapeStyle, type Tool } from '../stores/paintStore'
 import { useT } from '../i18n'
 import { CopyIcon, CropIcon, CutIcon, PasteIcon, SwapIcon, TrashIcon } from './icons'
 
@@ -17,6 +20,7 @@ export default function OptionsRow() {
   const s = usePaintStore()
   const key = sizeKey(s.tool)
   const hint = useScrollHint<HTMLDivElement>()
+  const under = useUnderTool(s.tool)
 
   let context: React.ReactNode = null
   if (key) {
@@ -108,7 +112,9 @@ export default function OptionsRow() {
 
   return (
     <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 lg:flex-row lg:items-center lg:gap-4 dark:border-slate-800 dark:bg-slate-900/60">
-      <div className="flex min-h-9 flex-1 flex-wrap items-center gap-x-4 gap-y-2">{context}</div>
+      <div ref={under.box} className="flex min-h-9 min-w-0 flex-1 items-center">
+        <div ref={under.inner} data-tool-options style={{ marginLeft: under.offset }} className="flex w-max shrink-0 max-w-full flex-wrap items-center gap-x-4 gap-y-2">{context}</div>
+      </div>
       <div className="flex min-w-0 items-center gap-3">
         <Colours />
         <div ref={hint.ref} style={hint.style} className="pt-noscrollbar min-w-0 flex-1 overflow-x-auto lg:flex-none">
@@ -121,6 +127,38 @@ export default function OptionsRow() {
       </div>
     </div>
   )
+}
+
+/**
+ * How far in the options start: level with the chosen tool's button in the
+ * row above (found by its `data-tool`), but never so far that they would run
+ * past the room they have. Follows the tool row's sideways scroll on a phone.
+ */
+function useUnderTool(tool: Tool) {
+  const box = useRef<HTMLDivElement>(null)
+  const inner = useRef<HTMLDivElement>(null)
+  const [offset, setOffset] = useState(0)
+  useLayoutEffect(() => {
+    const b = box.current, i = inner.current
+    if (!b || !i) return
+    const measure = () => {
+      const btn = document.querySelector<HTMLElement>(`[data-tool="${tool}"]`)
+      if (!btn) { setOffset(0); return }
+      const want = btn.getBoundingClientRect().left - b.getBoundingClientRect().left
+      setOffset(Math.round(Math.max(0, Math.min(b.clientWidth - i.offsetWidth, want))))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(b)
+    ro.observe(i)
+    const row = document.querySelector('[data-tool-row]')
+    row?.addEventListener('scroll', measure, { passive: true })
+    return () => {
+      ro.disconnect()
+      row?.removeEventListener('scroll', measure)
+    }
+  }, [tool])
+  return { box, inner, offset }
 }
 
 function Colours() {

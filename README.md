@@ -10,8 +10,9 @@ Live at **[opensource.unisim.co.uk/painter](https://opensource.unisim.co.uk/pain
 
 ## What it does
 
-- **One canvas, no layers.** Start a blank canvas at a chosen size (or one of
-  the presets), open a picture, or paste one.
+- **One canvas, no layers.** It opens straight onto a blank 1920 × 1080
+  canvas, shown whole. Click the name in the bar to rename it, or the size to
+  type a new one; start a new canvas from a preset, open a picture, or paste one.
 - **Tools:** pencil (hard-edged, exact to the pixel), brush (soft and round,
   following Apple Pencil pressure), eraser (rubs out to see-through), fill
   bucket (with a spread setting), line, box and ellipse (outline, filled, or
@@ -19,7 +20,10 @@ Live at **[opensource.unisim.co.uk/painter](https://opensource.unisim.co.uk/pain
   colour, plus any colour from the system picker.
 - **Select** a rectangle to move it (Alt/Option moves a copy), copy, cut,
   delete or **crop to it**. Paste a picture onto the canvas and move it into
-  place.
+  place; click away, and a click on it with Select picks the whole picture up
+  again (what it covered is put back).
+- **QR codes:** type a link and a QR code lands on the canvas like a paste,
+  drawn by the suite's shared `@unisim/qr` (as in Universal QR and PDF).
 - **The whole picture:** resize it (by percentage or pixels), change the canvas
   size (with an anchor), rotate left/right/180°, flip, and a few one-tap photo
   fixes: brightness and contrast, black and white, invert colours.

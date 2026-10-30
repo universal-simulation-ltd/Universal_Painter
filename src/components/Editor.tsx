@@ -282,6 +282,15 @@ export default function Editor() {
           }
         }
         if (f) doc.settle()
+        // A paste that was put down: a click on it picks the whole picture up
+        // again, ready to drag.
+        const hit = doc.placedAt(p.x, p.y)
+        const again = hit >= 0 ? doc.liftPlaced(hit) : null
+        if (again) {
+          s.setSelection({ x: again.x, y: again.y, width: again.canvas.width, height: again.canvas.height })
+          gesture.current = { kind: 'move', id: e.pointerId, grab: p, origin: { x: again.x, y: again.y } }
+          return
+        }
         s.setSelection(null)
         gesture.current = { kind: 'select', id: e.pointerId, start: p }
         return
@@ -290,7 +299,7 @@ export default function Editor() {
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!pointers.current.has(e.pointerId)) return
+    if (!pointers.current.has(e.pointerId)) { hover(e); return }
     const pt = local(e.clientX, e.clientY)
     pointers.current.set(e.pointerId, { ...pt, type: e.pointerType })
     const g = gesture.current
@@ -353,6 +362,20 @@ export default function Editor() {
       const f = doc.floating
       if (f) s.setSelection({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })
     }
+  }
+
+  /** With Select, a mouse over something that can be dragged shows the move cursor. */
+  const hover = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = viewRef.current
+    if (!el || e.pointerType !== 'mouse' || !doc.surface) return
+    const s = usePaintStore.getState()
+    let movable = false
+    if (s.tool === 'select') {
+      const p = toDoc(e.clientX, e.clientY)
+      const sel = s.selection
+      movable = (!!sel && p.x >= sel.x && p.y >= sel.y && p.x <= sel.x + sel.width && p.y <= sel.y + sel.height) || doc.placedAt(p.x, p.y) >= 0
+    }
+    el.dataset.movable = movable ? 'true' : ''
   }
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -436,7 +459,7 @@ export default function Editor() {
     <div
       ref={viewRef}
       className="pt-viewport relative h-full w-full overflow-hidden select-none"
-      style={{ touchAction: 'none', cursor }}
+      style={{ touchAction: 'none', ['--pt-cursor' as string]: cursor }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

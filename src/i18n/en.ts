@@ -15,25 +15,18 @@ const common = {
 }
 
 const app = {
-  footer: '100% free, every feature, no paywalls. Open source, made by {james} and {team}.',
-  footer_team: 'the UNI·SIM team',
-  github_label: 'Universal Painter on GitHub',
-  github_title: 'View source on GitHub',
   drop_title: 'Drop to open',
   drop_hint: 'PNG, JPEG, WebP or HEIC',
   close_unsaved: 'Close this picture? Changes you haven’t saved will be lost.',
   replace_unsaved: 'Open this instead? Changes you haven’t saved will be lost.',
   canvas_label: 'Picture being painted, {w} by {h} pixels',
+  rename: 'Rename the picture',
+  rename_tip: 'Click to rename',
+  size_edit: 'Canvas size',
+  size_tip: 'Click to change the canvas size',
 }
 
 const landing = {
-  title: 'Draw, or touch up a picture',
-  lead: 'One canvas and the classic tools: pencil, brush, shapes, text and a fill bucket, plus crop, resize, rotate and a few one-tap photo fixes. Closer to Paint than Photoshop.',
-  open: 'Open a picture',
-  open_hint: 'or drop one anywhere: PNG, JPEG, WebP or HEIC',
-  paste: 'Paste a picture',
-  paste_hint: 'Ctrl+V (⌘V on a Mac) works too',
-  blank_title: 'Start a blank canvas',
   preset_screen: 'Screen',
   preset_square: 'Square',
   preset_hd: 'Full HD',
@@ -72,6 +65,8 @@ const tools = {
   save: 'Save',
   picture: 'Picture',
   picture_tip: 'Crop, resize, rotate, flip and adjust the whole picture',
+  qr: 'QR code',
+  qr_tip: 'Put a QR code on the canvas',
 }
 
 const options = {
@@ -163,7 +158,6 @@ const menu = {
   label: 'Painter',
   new: 'New blank canvas…',
   open: 'Open a picture…',
-  paste: 'Paste a picture',
   save_png: 'Save as PNG',
   save_jpeg: 'Save as JPEG',
 }
@@ -199,7 +193,16 @@ const errors = {
   not_image: '{name} isn’t a picture Painter can open.',
 }
 
-export const en = { common, app, landing, tools, options, zoom, picture, dialogs, menu, tune, notices, errors }
+const qr = {
+  title: 'Add a QR code',
+  data: 'Link or text',
+  size: 'Size',
+  place: 'Put it on the canvas',
+  empty: 'Type a link to see the code',
+  hint: 'It lands like a paste: drag it into place. Click it later with Select to move it again.',
+}
+
+export const en = { common, app, landing, tools, options, zoom, picture, dialogs, menu, tune, notices, errors, qr }
 
 /** The shape every language must match exactly, once it is finished. */
 export type Messages = {

@@ -1,13 +1,14 @@
-// The row of tools. On a phone it scrolls sideways, and shows it: the last
-// button that fits is cut in half at the edge, and the edge fades (BRANDING.md,
-// "A row that scrolls shows it scrolls").
+// The row of tools, centred. On a phone it scrolls sideways, and shows it: the
+// last button that fits is cut in half at the edge, and the edge fades
+// (BRANDING.md, "A row that scrolls shows it scrolls"). Each tool button
+// carries `data-tool`, which the options row lines itself up under.
 import { useRef, useSyncExternalStore } from 'react'
 import { doc } from '../lib/doc'
 import { redo, undo } from '../lib/actions'
 import { useCutOffWidth, useScrollHint } from '../lib/scrollRow'
 import { TOOLS, usePaintStore, type Tool } from '../stores/paintStore'
 import { useT } from '../i18n'
-import { PictureIcon, RedoIcon, SaveIcon, TOOL_ICONS, UndoIcon } from './icons'
+import { PictureIcon, QrIcon, RedoIcon, SaveIcon, TOOL_ICONS, UndoIcon } from './icons'
 
 const BASE = 64
 
@@ -19,8 +20,8 @@ export default function ToolRow() {
   const setDialog = usePaintStore((s) => s.setDialog)
   const hint = useScrollHint<HTMLDivElement>()
   const outer = useRef<HTMLDivElement>(null)
-  // 2 history + 11 tools + Picture + Save, all one width.
-  const width = useCutOffWidth(outer, BASE, TOOLS.length + 4)
+  // 2 history + 11 tools + Picture + QR code + Save, all one width.
+  const width = useCutOffWidth(outer, BASE, TOOLS.length + 5)
 
   const pick = (next: Tool) => {
     if (next !== 'select' && doc.floating) doc.settle()
@@ -29,31 +30,37 @@ export default function ToolRow() {
 
   return (
     <div ref={outer} className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div ref={hint.ref} style={hint.style} className="pt-noscrollbar flex overflow-x-auto" role="toolbar" aria-label={t('tools.group')}>
-        <Btn width={width} label={t('tools.undo')} title={`${t('tools.undo')} (Ctrl+Z)`} disabled={!doc.canUndo} onClick={undo} icon={<UndoIcon />} />
-        <Btn width={width} label={t('tools.redo')} title={`${t('tools.redo')} (Ctrl+Shift+Z)`} disabled={!doc.canRedo} onClick={redo} icon={<RedoIcon />} />
-        <span aria-hidden="true" className="my-2 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
-        {TOOLS.map((id) => (
-          <Btn
-            key={id}
-            width={width}
-            label={t(`tools.${id}`)}
-            title={t(`tools.${id}_tip`)}
-            pressed={tool === id}
-            onClick={() => pick(id)}
-            icon={TOOL_ICONS[id]}
-          />
-        ))}
-        <span aria-hidden="true" className="my-2 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
-        <Btn width={width} label={t('tools.picture')} title={t('tools.picture_tip')} onClick={() => setDialog('image')} icon={<PictureIcon />} />
-        <Btn width={width} label={t('tools.save')} title={t('tools.save')} onClick={() => setDialog('save')} icon={<SaveIcon />} accent />
+      {/* ⚠️ Centred with auto margins on an inner row, not justify-center: those
+          fall back to 0 when the row overflows, so nothing is clipped at the start. */}
+      <div ref={hint.ref} style={hint.style} className="pt-noscrollbar flex overflow-x-auto" role="toolbar" aria-label={t('tools.group')} data-tool-row>
+        <div className="mx-auto flex">
+          <Btn width={width} label={t('tools.undo')} title={`${t('tools.undo')} (Ctrl+Z)`} disabled={!doc.canUndo} onClick={undo} icon={<UndoIcon />} />
+          <Btn width={width} label={t('tools.redo')} title={`${t('tools.redo')} (Ctrl+Shift+Z)`} disabled={!doc.canRedo} onClick={redo} icon={<RedoIcon />} />
+          <span aria-hidden="true" className="my-2 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
+          {TOOLS.map((id) => (
+            <Btn
+              key={id}
+              width={width}
+              label={t(`tools.${id}`)}
+              title={t(`tools.${id}_tip`)}
+              pressed={tool === id}
+              onClick={() => pick(id)}
+              icon={TOOL_ICONS[id]}
+              tool={id}
+            />
+          ))}
+          <span aria-hidden="true" className="my-2 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
+          <Btn width={width} label={t('tools.picture')} title={t('tools.picture_tip')} onClick={() => setDialog('image')} icon={<PictureIcon />} />
+          <Btn width={width} label={t('tools.qr')} title={t('tools.qr_tip')} onClick={() => setDialog('qr')} icon={<QrIcon />} />
+          <Btn width={width} label={t('tools.save')} title={t('tools.save')} onClick={() => setDialog('save')} icon={<SaveIcon />} accent />
+        </div>
       </div>
     </div>
   )
 }
 
 function Btn({
-  width, label, title, icon, onClick, pressed, disabled, accent,
+  width, label, title, icon, onClick, pressed, disabled, accent, tool,
 }: {
   width: number
   label: string
@@ -63,6 +70,7 @@ function Btn({
   pressed?: boolean
   disabled?: boolean
   accent?: boolean
+  tool?: Tool
 }) {
   return (
     <button
@@ -72,6 +80,7 @@ function Btn({
       aria-pressed={pressed === undefined ? undefined : pressed}
       disabled={disabled}
       onClick={onClick}
+      data-tool={tool}
       style={{ width, minWidth: width }}
       className={[
         'pt-tool flex shrink-0 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] leading-tight transition-colors',

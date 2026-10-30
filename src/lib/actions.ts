@@ -43,8 +43,12 @@ export function zoomBy(factor: number, cx = viewport.width / 2, cy = viewport.he
   store().setView(z, cx - (cx - panX) * k, cy - (cy - panY) * k)
 }
 
-/** The opening view: the person's chosen default (double-tap Fit or 100%), else Fit. */
+/**
+ * The opening view: the person's chosen default (double-tap Fit or 100%), else
+ * Fit. The blank canvas Painter opens on is always shown whole.
+ */
 export function showOpening() {
+  if (doc.starter) { showFit(); return }
   const pick = readDefaultView(PRODUCT, OPENS_AT_ROW) as OpensAt | null
   if (pick === 'actual') showActual()
   else showFit()
@@ -71,8 +75,8 @@ export async function openFiles(files: File[]) {
     if (files[0]) store().notify(t('errors.not_image', { name: files[0].name }), 'error')
     return
   }
-  // A picture dropped onto an open canvas is pasted in, as Paint does;
-  // otherwise it opens.
+  // A picture dropped onto an open canvas is pasted in, as Paint does
+  // (the blank canvas Painter opens on too); otherwise it opens.
   if (doc.surface) {
     try {
       const pic = await openPicture(file)
@@ -113,6 +117,40 @@ export function newBlank(width: number, height: number): boolean {
     return false
   }
   afterLoad()
+  return true
+}
+
+/** The canvas Painter opens on: Full HD, blank, shown whole. */
+export const STARTER = { width: 1920, height: 1080 } as const
+
+export function startBlank() {
+  if (newBlank(STARTER.width, STARTER.height)) doc.starter = true
+}
+
+/**
+ * The size in the bar, typed over: the canvas grows or is trimmed from the
+ * top-left, nothing is stretched (Picture › Resize does that). New edges are
+ * white, or see-through if new canvases start see-through. The untouched
+ * starter canvas is simply made again at the new size.
+ */
+export function setCanvasSize(width: number, height: number): boolean {
+  if (!doc.surface || (width === doc.width && height === doc.height)) return true
+  if (width < 1 || height < 1 || fitWithinLimits(width, height).scaled) {
+    store().notify(getT()('dialogs.too_big', { max: new Intl.NumberFormat(getT().locale).format(16_777_216) }), 'error')
+    return false
+  }
+  if (doc.starter) {
+    const stem = doc.stem
+    if (!newBlank(width, height)) return false
+    doc.starter = true
+    doc.rename(stem)
+    showFit()
+    return true
+  }
+  if (doc.floating) doc.settle()
+  store().setSelection(null)
+  doc.resizeCanvas(width, height, 0, useSettings.getState().transparentNew ? null : '#ffffff')
+  showFit()
   return true
 }
 
@@ -242,11 +280,12 @@ export async function save(format: SaveFormat, stem = doc.stem) {
   }
 }
 
-/** Back to the start page, asking first when there are unsaved changes. */
+/** Start again on a fresh blank canvas, asking first when there are unsaved changes. */
 export function closePicture(): boolean {
   if (doc.surface && doc.dirty && !window.confirm(getT()('app.close_unsaved'))) return false
   doc.close()
   store().setSelection(null)
   store().setDialog(null)
+  startBlank()
   return true
 }

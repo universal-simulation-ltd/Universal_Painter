@@ -3,7 +3,7 @@
 //
 // One `Sheet` for all of them: a centred card on a computer, a sheet from the
 // bottom on a phone. Esc, the backdrop and Cancel close it.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { doc } from '../lib/doc'
 import { cropToSelection, newBlank, save, showFit } from '../lib/actions'
 import { makeCanvas, MAX_PIXELS, stemOf, type SaveFormat } from '../lib/imageFiles'
@@ -11,6 +11,9 @@ import { brightnessContrast } from '../lib/pixels'
 import { usePaintStore } from '../stores/paintStore'
 import { useT } from '../i18n'
 import { CanvasIcon, CropIcon, FlipHIcon, FlipVIcon, GreyIcon, InvertIcon, ResizeIcon, RotateLeftIcon, RotateRightIcon, SunIcon } from './icons'
+
+// The QR library only downloads when someone asks for a code.
+const QrDialog = lazy(() => import('./QrDialog'))
 
 export default function Dialogs() {
   const dialog = usePaintStore((s) => s.dialog)
@@ -23,6 +26,7 @@ export default function Dialogs() {
     case 'adjust': return <AdjustDialog onClose={close} />
     case 'new': return <NewDialog onClose={close} />
     case 'save': return <SaveDialog onClose={close} />
+    case 'qr': return <Suspense fallback={null}><QrDialog onClose={close} /></Suspense>
     default: return null
   }
 }

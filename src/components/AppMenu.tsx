@@ -4,7 +4,7 @@
 import { useContext, useSyncExternalStore } from 'react'
 import { DefaultViewSelect, MENU, PreferencesThemeContext, type MenuTheme } from '@unisim/sdk'
 import { doc } from '../lib/doc'
-import { okToReplace, OPENS_AT_ROW, openFiles, pasteFromButton, save, type OpensAt } from '../lib/actions'
+import { okToReplace, OPENS_AT_ROW, openAsNew, save, type OpensAt } from '../lib/actions'
 import { usePaintStore } from '../stores/paintStore'
 import { useSettings, type Settings } from '../stores/settingsStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -15,12 +15,12 @@ const ROW: Record<MenuTheme, { rest: string; disabled: string; hoverBg: string; 
   dark: { rest: MENU.dark.body, disabled: MENU.dark.faint, hoverBg: MENU.dark.rowHover, hoverText: MENU.dark.rowHoverText },
 }
 
-/** Opens the system file picker, outside any drop zone. */
+/** Opens the system file picker, outside any drop zone; the choice replaces the picture. */
 function pickFile() {
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif'
-  input.onchange = () => { if (input.files?.length) void openFiles(Array.from(input.files)) }
+  input.onchange = () => { const f = input.files?.[0]; if (f) void openAsNew(f) }
   input.click()
 }
 
@@ -33,8 +33,7 @@ export default function AppMenu() {
   return (
     <>
       <MenuRow theme={theme} icon="🆕" label={t('menu.new')} onClick={() => { if (!open) setDialog('new'); else if (okToReplace()) setDialog('new') }} />
-      <MenuRow theme={theme} icon="📂" label={t('menu.open')} onClick={() => { if (!open || okToReplace()) { if (open) doc.close(); pickFile() } }} />
-      <MenuRow theme={theme} icon="📋" label={t('menu.paste')} onClick={() => void pasteFromButton()} />
+      <MenuRow theme={theme} icon="📂" label={t('menu.open')} onClick={() => { if (!open || okToReplace()) pickFile() }} />
       <MenuRow theme={theme} icon="💾" label={t('menu.save_png')} disabled={!open} onClick={() => void save('image/png')} />
       <MenuRow theme={theme} icon="🖼" label={t('menu.save_jpeg')} disabled={!open} onClick={() => void save('image/jpeg')} />
     </>

@@ -4,14 +4,14 @@ import { DropAnywhere, UniversalAppsNavBar, UpdateNotice, useFileDrop, type Abou
 import credits from './generated/credits.json'
 import ProductLogo from './components/Header/ProductLogo'
 import AppMenu, { TuneRows } from './components/AppMenu'
-import Landing from './components/Landing'
+import PictureTitle from './components/Header/PictureTitle'
 import Editor from './components/Editor'
 import ToolRow from './components/ToolRow'
 import OptionsRow from './components/OptionsRow'
 import ZoomControls from './components/ZoomControls'
 import Dialogs from './components/Dialogs'
 import { doc } from './lib/doc'
-import { closePicture, copySelection, cropToSelection, cutSelection, deleteSelection, deselect, openFiles, pasteFromEvent, redo, selectAll, showActual, showFit, undo, zoomBy } from './lib/actions'
+import { closePicture, copySelection, cropToSelection, cutSelection, deleteSelection, deselect, openFiles, pasteFromEvent, redo, selectAll, showActual, showFit, startBlank, undo, zoomBy } from './lib/actions'
 import { CONTAINER, EDITOR_CONTAINER, REPO_URL } from './lib/layout'
 import { usePaintStore, type Tool } from './stores/paintStore'
 import { useSettings } from './stores/settingsStore'
@@ -46,6 +46,11 @@ export default function App() {
     usePaintStore.getState().resetTools()
     useSettings.getState().reset()
   }
+
+  // Painter opens straight onto a blank Full HD canvas, shown whole: no start
+  // page (James, 2026-10-30). Open, paste and drop all work from there, and
+  // a picture opened onto the untouched canvas replaces it.
+  useEffect(() => { if (!doc.surface) startBlank() }, [open])
 
   // A picture dropped anywhere on the open editor is pasted in, as Paint does.
   // The start page has its own page-wide zone (the drop circle).
@@ -110,21 +115,17 @@ export default function App() {
   return (
     // ⚠️ pt-[env(safe-area-inset-top)] keeps the bar clear of a notch in a
     // full-screen web app; 0 in a normal browser tab.
-    <div className={`flex flex-col bg-slate-100 pt-[env(safe-area-inset-top)] dark:bg-slate-950 ${open ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'}`}>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-100 pt-[env(safe-area-inset-top)] dark:bg-slate-950">
       <UniversalAppsNavBar
         product="painter"
         theme={theme}
         productLogo={<ProductLogo />}
         productHomeHref={import.meta.env.BASE_URL}
         // With a picture open the identity cluster becomes a home button, as in
-        // Universal PDF and Images: back to the start page (asking first if
-        // there are unsaved changes).
+        // Universal PDF and Images: back to a fresh blank canvas (asking first
+        // if there are unsaved changes).
         onHome={open ? () => { closePicture() } : undefined}
-        centre={open ? (
-          <span className="hidden truncate text-xs text-slate-500 md:inline dark:text-slate-400">
-            {doc.stem} · {doc.width} × {doc.height}{doc.dirty ? ' •' : ''}
-          </span>
-        ) : undefined}
+        centre={open ? <PictureTitle /> : undefined}
         actions={<AppMenu />}
         actionsLabel={t('menu.label')}
         themeStore={useThemeStore}
@@ -151,34 +152,8 @@ export default function App() {
           </main>
         </>
       ) : (
-        <>
-          <main className="flex-1">
-            <Landing />
-          </main>
-          <footer className="border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-slate-800 dark:bg-slate-900">
-            <div className={`${CONTAINER} flex flex-row items-center gap-3 py-4 text-xs text-slate-500 sm:gap-4 dark:text-slate-400`}>
-              <span>
-                {t.rich('app.footer', {
-                  james: <a href="https://www.jamesmarkey.co.uk" target="_blank" rel="noreferrer" className="text-slate-700 underline-offset-2 hover:text-orange-700 hover:underline dark:text-slate-200 dark:hover:text-orange-400">James Markey MBE</a>,
-                  team: <a href="https://www.unisim.co.uk" target="_blank" rel="noreferrer" className="text-slate-700 underline-offset-2 hover:text-orange-700 hover:underline dark:text-slate-200 dark:hover:text-orange-400">{t('app.footer_team')}</a>,
-                })}
-              </span>
-              <a
-                href={REPO_URL}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={t('app.github_label')}
-                title={t('app.github_title')}
-                className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
-                  <path d="M12 .5C5.65.5.5 5.65.5 12.02c0 5.09 3.29 9.4 7.86 10.92.57.1.78-.25.78-.55 0-.27-.01-1-.02-1.96-3.2.69-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.95.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.39 2.89-.39.98 0 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.18 1.82 1.18 3.08 0 4.42-2.69 5.39-5.26 5.68.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.21.66.79.55 4.57-1.52 7.86-5.83 7.86-10.92C23.5 5.65 18.35.5 12 .5z" />
-                </svg>
-                <span className="hidden sm:inline">GitHub</span>
-              </a>
-            </div>
-          </footer>
-        </>
+        // The moment before the starter canvas is made.
+        <main className="flex-1" />
       )}
 
       <DropAnywhere show={pageDrop.pageOver && open} title={t('app.drop_title')} hint={t('app.drop_hint')} icon={<span aria-hidden="true">🎨</span>} />

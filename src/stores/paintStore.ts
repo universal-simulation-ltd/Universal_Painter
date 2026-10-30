@@ -19,7 +19,7 @@ export const TOOLS: Tool[] = ['pencil', 'brush', 'eraser', 'fill', 'line', 'box'
 /** Outline only, filled only, or an outline in the first colour round a fill in the second. */
 export type ShapeStyle = 'outline' | 'fill' | 'both'
 
-export type Dialog = null | 'new' | 'resize' | 'canvas' | 'adjust' | 'image' | 'save'
+export type Dialog = null | 'new' | 'resize' | 'canvas' | 'adjust' | 'image' | 'save' | 'qr'
 
 /** The 28 colours of the palette: Paint's own idea, in the suite's tones. */
 export const PALETTE = [
