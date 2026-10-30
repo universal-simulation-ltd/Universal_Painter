@@ -24,7 +24,7 @@
   "dependencies": {
     "@unisim/media": "^0.8.0",
     "@unisim/qr": "^0.1.0",
-    "@unisim/sdk": "^0.204.0",
+    "@unisim/sdk": "^0.213.0",
     "heic-to": "^1.6.6",
     "qr-code-styling": "^1.9.2",
     "react": "^18.3.1",
