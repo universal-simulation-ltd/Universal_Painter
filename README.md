@@ -16,8 +16,8 @@ Live at **[opensource.unisim.co.uk/painter](https://opensource.unisim.co.uk/pain
 - **Tools:** pencil (hard-edged, exact to the pixel), brush (soft and round,
   following Apple Pencil pressure), eraser (rubs out to see-through), fill
   bucket (with a spread setting), line, box and ellipse (outline, filled, or
-  both), text, colour picker, and a 28-colour palette with a first and second
-  colour, plus any colour from the system picker.
+  both), text, colour picker, and a first and second colour (each opens the
+  system colour picker), with a swap, next to the tools.
 - **Select** a rectangle to move it (Alt/Option moves a copy), copy, cut,
   delete or **crop to it**. Paste a picture onto the canvas and move it into
   place; click away, and a click on it with Select picks the whole picture up
