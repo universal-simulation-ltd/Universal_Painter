@@ -19,13 +19,33 @@ type Pt = { x: number; y: number }
 
 type Gesture =
   | { kind: 'paint'; id: number; tool: 'pencil' | 'brush' | 'eraser'; last: Pt; colour: string; dirty: Rect | null }
-  | { kind: 'shape'; id: number; tool: 'line' | 'box' | 'ellipse'; start: Pt; end: Pt; ink: ShapeInk; shown: Rect | null }
+  | { kind: 'shape'; id: number; tool: ShapeTool; start: Pt; end: Pt; ink: ShapeInk; swapped: boolean; shown: Rect | null }
   | { kind: 'select'; id: number; start: Pt }
   | { kind: 'move'; id: number; grab: Pt; origin: Pt }
   | { kind: 'pan'; id: number; from: Pt; panX: number; panY: number }
   | { kind: 'pinch'; ids: [number, number]; dist: number; mid: Pt; zoom: number; panX: number; panY: number }
 
 interface TextBox { id: number; x: number; y: number; value: string }
+
+type ShapeTool = 'line' | 'box' | 'ellipse'
+
+/**
+ * The shape just drawn, while nothing else has happened (`version` is the
+ * doc's version straight after it): changing the shape style, the line width
+ * or a colour redraws it that way instead of only the next one, as one undo
+ * step (James, 2026-10-30: "box filled, then click outline").
+ */
+interface LastShape { gesture: Extract<Gesture, { kind: 'shape' }>; shift: boolean; version: number }
+
+/** The ink a shape is drawn with; a right-button shape swaps the two colours. */
+function inkFor(s: ReturnType<typeof usePaintStore.getState>, tool: ShapeTool, swapped: boolean): ShapeInk {
+  return {
+    primary: swapped ? s.secondary : s.primary,
+    secondary: swapped ? s.primary : s.secondary,
+    width: s.sizes.shape,
+    style: tool === 'line' ? 'outline' : s.shapeStyle,
+  }
+}
 
 const DRAW_TOOLS: Tool[] = ['pencil', 'brush', 'eraser', 'fill', 'line', 'box', 'ellipse', 'text', 'picker', 'select']
 
@@ -155,6 +175,17 @@ export default function Editor() {
     return drawShape(ctx, g.tool, rectFromPoints(g.start.x, g.start.y, end.x, end.y), g.ink)
   }
 
+  // The shape just drawn follows a change of style, width or colour.
+  const lastShape = useRef<LastShape | null>(null)
+  useEffect(() => usePaintStore.subscribe((s, prev) => {
+    const last = lastShape.current
+    if (!last) return
+    if (s.tool !== last.gesture.tool || doc.version !== last.version) { lastShape.current = null; return }
+    if (s.shapeStyle === prev.shapeStyle && s.sizes.shape === prev.sizes.shape && s.primary === prev.primary && s.secondary === prev.secondary) return
+    const g = { ...last.gesture, ink: inkFor(s, last.gesture.tool, last.gesture.swapped) }
+    if (doc.amendLast((ctx) => drawShapeTo(ctx, g, last.shift))) lastShape.current = { ...last, gesture: g, version: doc.version }
+  }), []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Pointer handling ───────────────────────────────────────────────────
   const widthFor = (e: PointerEvent | React.PointerEvent, size: number) => {
     if (e.pointerType !== 'pen' || useSettings.getState().ignorePressure) return size
@@ -232,13 +263,8 @@ export default function Editor() {
       case 'line':
       case 'box':
       case 'ellipse': {
-        const ink: ShapeInk = {
-          primary: secondary ? s.secondary : s.primary,
-          secondary: secondary ? s.primary : s.secondary,
-          width: s.sizes.shape,
-          style: s.tool === 'line' ? 'outline' : s.shapeStyle,
-        }
-        gesture.current = { kind: 'shape', id: e.pointerId, tool: s.tool, start: p, end: p, ink, shown: null }
+        const ink = inkFor(s, s.tool, secondary)
+        gesture.current = { kind: 'shape', id: e.pointerId, tool: s.tool, start: p, end: p, ink, swapped: secondary, shown: null }
         return
       }
       case 'fill': {
@@ -402,6 +428,7 @@ export default function Editor() {
       doc.begin()
       const r = drawShapeTo(doc.surface.ctx, g, e.shiftKey)
       doc.commit(r)
+      lastShape.current = { gesture: g, shift: e.shiftKey, version: doc.version }
     }
   }
 

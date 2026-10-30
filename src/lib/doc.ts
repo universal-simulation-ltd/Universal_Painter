@@ -175,6 +175,23 @@ class PaintDoc {
 
   get isEditing() { return this.editing }
 
+  /**
+   * Draw the newest edit again, differently, in its place: put back what it
+   * covered, run `draw`, and keep the result as that same one undo step. For
+   * a shape restyled straight after it was drawn. The caller makes sure the
+   * newest edit really is the one being redrawn (nothing has happened since).
+   */
+  amendLast(draw: (ctx: CanvasRenderingContext2D) => Rect): boolean {
+    const s = this.surface
+    if (!s || this.floating || this.editing || !this.history.canUndo) return false
+    // A patch swaps back in place, so the surface stays the same canvas; the
+    // undone entry sits on the redo stack until commit() pushes and clears it.
+    this.surface = this.history.undo(s)
+    this.begin()
+    this.commit(draw(this.surface.ctx))
+    return true
+  }
+
   // ── Edits that replace the whole picture (resize, rotate, crop, adjust) ──
 
   /** Swap in a new canvas, keeping the old one for undo. */
