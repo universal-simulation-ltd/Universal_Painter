@@ -81,8 +81,6 @@ export const ptPT: Draft = {
     secondary: 'Segunda cor',
     swap: 'Trocar as duas cores',
     custom_colour: 'Qualquer cor',
-    colour_set: 'Cor {hex}',
-    colour_hint: 'Toque para a primeira cor; clique direito ou toque longo para a segunda',
     picker_hint: 'Toque na imagem para tirar uma cor dela',
     select_hint: 'Arraste um retângulo à volta de uma parte da imagem',
     selected: '{w} × {h} selecionados',

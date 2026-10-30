@@ -81,8 +81,6 @@ export const it: Draft = {
     secondary: 'Secondo colore',
     swap: 'Scambia i due colori',
     custom_colour: 'Qualsiasi colore',
-    colour_set: 'Colore {hex}',
-    colour_hint: 'Tocca per il primo colore; clic destro o pressione lunga per il secondo',
     picker_hint: 'Tocca l’immagine per prenderne un colore',
     select_hint: 'Trascina un riquadro attorno a una parte dell’immagine',
     selected: '{w} × {h} selezionati',

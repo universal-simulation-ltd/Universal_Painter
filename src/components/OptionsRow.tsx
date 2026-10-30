@@ -1,16 +1,15 @@
-// The second row: what the chosen tool can be set to, then the two colours and
-// the palette. A swatch tap sets the first colour; a right-click or a long
-// press sets the second, as in Paint.
+// The second row: what the chosen tool can be set to. (The two colours live in
+// the tool row, left of Pencil; the 28-swatch palette was dropped, James
+// 2026-10-30: each colour opens the system picker instead.)
 //
 // The tool's options start under the tool's own button (James, 2026-10-30),
 // slid back left only as far as they need to fit.
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { doc } from '../lib/doc'
 import { copySelection, cropToSelection, cutSelection, deleteSelection, deselect, pasteFromButton, selectAll } from '../lib/actions'
-import { useScrollHint } from '../lib/scrollRow'
-import { PALETTE, sizeKey, usePaintStore, type ShapeStyle, type Tool } from '../stores/paintStore'
+import { sizeKey, usePaintStore, type ShapeStyle, type Tool } from '../stores/paintStore'
 import { useT } from '../i18n'
-import { CopyIcon, CropIcon, CutIcon, PasteIcon, SwapIcon, TrashIcon } from './icons'
+import { CopyIcon, CropIcon, CutIcon, PasteIcon, TrashIcon } from './icons'
 
 const SIZE_MAX = { pencil: 16, brush: 120, eraser: 200, shape: 60 } as const
 
@@ -19,7 +18,6 @@ export default function OptionsRow() {
   useSyncExternalStore(doc.subscribe, doc.getVersion)
   const s = usePaintStore()
   const key = sizeKey(s.tool)
-  const hint = useScrollHint<HTMLDivElement>()
   const under = useUnderTool(s.tool)
 
   let context: React.ReactNode = null
@@ -111,19 +109,9 @@ export default function OptionsRow() {
   }
 
   return (
-    <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 lg:flex-row lg:items-center lg:gap-4 dark:border-slate-800 dark:bg-slate-900/60">
-      <div ref={under.box} className="flex min-h-9 min-w-0 flex-1 items-center">
+    <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60">
+      <div ref={under.box} className="flex min-h-9 min-w-0 items-center">
         <div ref={under.inner} data-tool-options style={{ marginLeft: under.offset }} className="flex w-max shrink-0 max-w-full flex-wrap items-center gap-x-4 gap-y-2">{context}</div>
-      </div>
-      <div className="flex min-w-0 items-center gap-3">
-        <Colours />
-        <div ref={hint.ref} style={hint.style} className="pt-noscrollbar min-w-0 flex-1 overflow-x-auto lg:flex-none">
-          <div className="grid w-max grid-flow-col grid-rows-2 gap-1" role="listbox" aria-label={t('options.colour_hint')}>
-            {PALETTE.map((hex) => (
-              <Swatch key={hex} hex={hex} />
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   )
@@ -159,59 +147,6 @@ function useUnderTool(tool: Tool) {
     }
   }, [tool])
   return { box, inner, offset }
-}
-
-function Colours() {
-  const t = useT()
-  const primary = usePaintStore((s) => s.primary)
-  const secondary = usePaintStore((s) => s.secondary)
-  const setPrimary = usePaintStore((s) => s.setPrimary)
-  const setSecondary = usePaintStore((s) => s.setSecondary)
-  const swap = usePaintStore((s) => s.swapColours)
-  return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <div className="relative h-11 w-11">
-        <label className="absolute left-0 top-0 h-7 w-7 cursor-pointer rounded-md border-2 border-white shadow ring-1 ring-slate-300 dark:border-slate-900 dark:ring-slate-600" style={{ background: primary, zIndex: 1 }} title={t('options.primary')}>
-          <input type="color" value={primary} onChange={(e) => setPrimary(e.target.value)} className="sr-only" aria-label={t('options.primary')} />
-        </label>
-        <label className="absolute bottom-0 right-0 h-7 w-7 cursor-pointer rounded-md border-2 border-white shadow ring-1 ring-slate-300 dark:border-slate-900 dark:ring-slate-600" style={{ background: secondary, zIndex: 0 }} title={t('options.secondary')}>
-          <input type="color" value={secondary} onChange={(e) => setSecondary(e.target.value)} className="sr-only" aria-label={t('options.secondary')} />
-        </label>
-      </div>
-      <button type="button" onClick={swap} title={t('options.swap')} aria-label={t('options.swap')} className="rounded-md p-1.5 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800">
-        <SwapIcon />
-      </button>
-    </div>
-  )
-}
-
-function Swatch({ hex }: { hex: string }) {
-  const t = useT()
-  const setPrimary = usePaintStore((s) => s.setPrimary)
-  const setSecondary = usePaintStore((s) => s.setSecondary)
-  const primary = usePaintStore((s) => s.primary)
-  const timer = useRef<number | null>(null)
-  const long = useRef(false)
-  return (
-    <button
-      type="button"
-      role="option"
-      aria-selected={primary.toLowerCase() === hex}
-      title={t('options.colour_set', { hex })}
-      aria-label={t('options.colour_set', { hex })}
-      onClick={() => { if (!long.current) setPrimary(hex); long.current = false }}
-      onContextMenu={(e) => { e.preventDefault(); setSecondary(hex) }}
-      onPointerDown={(e) => {
-        if (e.pointerType !== 'touch') return
-        long.current = false
-        timer.current = window.setTimeout(() => { long.current = true; setSecondary(hex) }, 500)
-      }}
-      onPointerUp={() => { if (timer.current) clearTimeout(timer.current) }}
-      onPointerLeave={() => { if (timer.current) clearTimeout(timer.current) }}
-      className="h-5 w-5 rounded-[5px] ring-1 ring-slate-300 transition-transform hover:scale-110 aria-selected:ring-2 aria-selected:ring-orange-500 dark:ring-slate-600"
-      style={{ background: hex, touchAction: 'manipulation' }}
-    />
-  )
 }
 
 function Segmented<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {

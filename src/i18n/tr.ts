@@ -81,8 +81,6 @@ export const tr: Draft = {
     secondary: 'İkinci renk',
     swap: 'İki rengi değiştir',
     custom_colour: 'Herhangi bir renk',
-    colour_set: 'Renk {hex}',
-    colour_hint: 'Birinci renk için dokunun; ikinci renk için sağ tıklayın veya uzun basın',
     picker_hint: 'Resimden renk almak için dokunun',
     select_hint: 'Resmin bir bölümünün çevresine kutu çizin',
     selected: '{w} × {h} seçildi',

@@ -85,8 +85,6 @@ const options = {
   secondary: 'Second colour',
   swap: 'Swap the two colours',
   custom_colour: 'Any colour',
-  colour_set: 'Colour {hex}',
-  colour_hint: 'Tap for the first colour; right-click or long-press for the second',
   picker_hint: 'Tap the picture to take a colour from it',
   select_hint: 'Drag a box round part of the picture',
   selected: '{w} × {h} selected',

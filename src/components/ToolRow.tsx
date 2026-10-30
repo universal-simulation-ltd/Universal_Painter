@@ -8,9 +8,11 @@ import { redo, undo } from '../lib/actions'
 import { useCutOffWidth, useScrollHint } from '../lib/scrollRow'
 import { TOOLS, usePaintStore, type Tool } from '../stores/paintStore'
 import { useT } from '../i18n'
-import { PictureIcon, QrIcon, RedoIcon, SaveIcon, TOOL_ICONS, UndoIcon } from './icons'
+import { PictureIcon, QrIcon, RedoIcon, SaveIcon, SwapIcon, TOOL_ICONS, UndoIcon } from './icons'
 
 const BASE = 64
+/** The two colours and the swap button, left of Pencil. */
+const COLOURS_WIDTH = 100
 
 export default function ToolRow() {
   const t = useT()
@@ -20,8 +22,8 @@ export default function ToolRow() {
   const setDialog = usePaintStore((s) => s.setDialog)
   const hint = useScrollHint<HTMLDivElement>()
   const outer = useRef<HTMLDivElement>(null)
-  // 2 history + 11 tools + Picture + QR code + Save, all one width.
-  const width = useCutOffWidth(outer, BASE, TOOLS.length + 5)
+  // 2 history + 11 tools + Picture + QR code + Save, all one width, plus the colours.
+  const width = useCutOffWidth(outer, BASE, TOOLS.length + 5, COLOURS_WIDTH)
 
   const pick = (next: Tool) => {
     if (next !== 'select' && doc.floating) doc.settle()
@@ -37,6 +39,7 @@ export default function ToolRow() {
           <Btn width={width} label={t('tools.undo')} title={`${t('tools.undo')} (Ctrl+Z)`} disabled={!doc.canUndo} onClick={undo} icon={<UndoIcon />} />
           <Btn width={width} label={t('tools.redo')} title={`${t('tools.redo')} (Ctrl+Shift+Z)`} disabled={!doc.canRedo} onClick={redo} icon={<RedoIcon />} />
           <span aria-hidden="true" className="my-2 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
+          <Colours />
           {TOOLS.map((id) => (
             <Btn
               key={id}
@@ -95,5 +98,30 @@ function Btn({
       {icon}
       <span className="line-clamp-2 max-w-full break-words text-center [hyphens:auto]">{label}</span>
     </button>
+  )
+}
+
+/** The first and second colours (each opens the system colour picker) and the swap. */
+function Colours() {
+  const t = useT()
+  const primary = usePaintStore((s) => s.primary)
+  const secondary = usePaintStore((s) => s.secondary)
+  const setPrimary = usePaintStore((s) => s.setPrimary)
+  const setSecondary = usePaintStore((s) => s.setSecondary)
+  const swap = usePaintStore((s) => s.swapColours)
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 px-2.5" style={{ width: COLOURS_WIDTH }}>
+      <div className="relative h-11 w-11">
+        <label className="absolute left-0 top-0 h-7 w-7 cursor-pointer rounded-md border-2 border-white shadow ring-1 ring-slate-300 dark:border-slate-900 dark:ring-slate-600" style={{ background: primary, zIndex: 1 }} title={t('options.primary')}>
+          <input type="color" value={primary} onChange={(e) => setPrimary(e.target.value)} className="sr-only" aria-label={t('options.primary')} />
+        </label>
+        <label className="absolute bottom-0 right-0 h-7 w-7 cursor-pointer rounded-md border-2 border-white shadow ring-1 ring-slate-300 dark:border-slate-900 dark:ring-slate-600" style={{ background: secondary, zIndex: 0 }} title={t('options.secondary')}>
+          <input type="color" value={secondary} onChange={(e) => setSecondary(e.target.value)} className="sr-only" aria-label={t('options.secondary')} />
+        </label>
+      </div>
+      <button type="button" onClick={swap} title={t('options.swap')} aria-label={t('options.swap')} className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+        <SwapIcon />
+      </button>
+    </div>
   )
 }
