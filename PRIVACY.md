@@ -30,7 +30,11 @@ If you open your browser's Network tab you will see a few requests:
 - **The page itself**, its scripts and styles, from opensource.unisim.co.uk.
 - **The changelog and update notice**, from changelog.unisim.co.uk.
 
-There is **no sign-in** (`noAccounts` in [`src/main.tsx`](src/main.tsx)), no
+There is **no account of its own**, and nothing here needs one (`noAccounts` in
+[`src/main.tsx`](src/main.tsx)). If your browser is already signed in to the
+suite (a Universal ID), the app recognises it so your suite-wide settings, such
+as colour scheme and language, come with you, and Tune this app offers a
+discreet Sign in; your pictures are never tied to it. There is no
 usage tracking and no user count: the suite's anonymous daily open count is
 switched off here (`openCount: false`). There is no analytics, no tracking pixel
 and no advertising script. The Content-Security-Policy in

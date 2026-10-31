@@ -48,7 +48,7 @@ Ctrl/⌘ + 0 fit, Ctrl/⌘ + 1 actual size.
 ## Everything stays on your device
 
 Pictures are opened, painted and saved by your own browser. There is no
-upload, no server doing the work, no sign-in and no usage tracking. See
+upload, no server doing the work, no account needed and no usage tracking. See
 [PRIVACY.md](PRIVACY.md) for what that means and how to check it.
 
 ## Shared code with Universal Images

@@ -8,11 +8,13 @@ import './index.css'
 // Universal Painter never sends a picture anywhere. <UniversalProvider> is
 // mounted for the shared navbar, the suite language and Tune this app.
 //
-// No sign-in, in every build (James, 2026-10-20: no logins in first iterations
-// unless they improve the experience; Docs_UNI_SIM/login-free-plan.md). Nothing
-// here needs an account. `noAccounts` drops every account row, keeps the app
-// signed out of any suite session the browser holds, and switches the SDK's
-// anonymous daily open count off. No <UsageTracker /> either.
+// No accounts of its own, in every build (James, 2026-10-20: no logins in first
+// iterations unless they improve the experience;
+// Docs_UNI_SIM/login-free-plan.md). Nothing here needs an account. `noAccounts`
+// drops every account row and switches the SDK's anonymous daily open count
+// off. Since SDK 0.211.0 it no longer keeps the app signed out: a suite session
+// the browser already holds is read and followed (Global Tuning comes with it),
+// and Tune this app offers a discreet Sign in. No <UsageTracker /> either.
 //
 // `product: 'painter'` type-checks because the SDK's `ProductCode` really holds
 // it (@unisim/sdk 0.204.0, with the `product_code` enum value from platform
