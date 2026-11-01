@@ -6,7 +6,7 @@
 // canvas itself when they draw.
 import { History, type Surface } from './history'
 import { makeCanvas, stepDown } from './imageFiles'
-import { capture, contains, intersect, NO_FLIP, normalAngle, overlaps, render, turned, type Flip, type Item, type Source } from './objects'
+import { capture, contains, frameOf, intersect, NO_FLIP, normalAngle, overlaps, render, turned, turnPoint, type Flip, type Item, type Source } from './objects'
 import { anchorOffset, brightnessContrast, clampRect, greyscale, invert, unionRect, type Rect } from './pixels'
 
 /** Undo memory: generous on a computer, careful on a phone or tablet. */
@@ -213,9 +213,16 @@ class PaintDoc {
     return true
   }
 
-  /** The newest object under (x, y), or -1. */
+  /** The newest object under (x, y), or -1. A turned one counts only inside its own turned frame. */
   itemAt(x: number, y: number): number {
-    for (let i = this.items.length - 1; i >= 0; i--) if (contains(this.items[i].rect, x, y)) return i
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i]
+      if (!contains(it.rect, x, y)) continue
+      if (!turned(it.angle)) return i
+      const { frame, cx, cy } = frameOf(it.source, it.inner)
+      const at = turnPoint(x, y, cx, cy, -it.angle)
+      if (contains(frame, at.x, at.y)) return i
+    }
     return -1
   }
 
