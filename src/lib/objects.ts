@@ -26,12 +26,20 @@ export type Source =
   /** A paste, a QR code or lifted pixels: drawn from this original, so resizing never compounds. */
   | { kind: 'image'; canvas: HTMLCanvasElement }
 
+/** Which ways an object is mirrored. */
+export interface Flip { h: boolean; v: boolean }
+export const NO_FLIP: Flip = { h: false, v: false }
+
 /** An object on the canvas. Every field is fixed once made: a change makes a new one. */
 export interface Item {
   source: Source
   /** The shape's own box: the dragged box, a line's two ends, the text, the picture. */
   inner: Rect
-  /** Where `pixels` sits on the canvas: `inner` plus room for the line width. */
+  /** Degrees it is turned clockwise about its centre (James, 2026-11-01); 0 is upright. */
+  angle: number
+  /** Mirrored left to right and/or top to bottom, in its own frame (before it is turned). */
+  flip: Flip
+  /** Where `pixels` sits on the canvas: `inner` plus room for the line width, turned by `angle`. */
   rect: Rect
   pixels: HTMLCanvasElement
   /** What the object covered when it was put down. */
@@ -54,8 +62,91 @@ export function rectFor(source: Source, inner: Rect): Rect {
   return { x: inner.x - p, y: inner.y - p, width: inner.width + p * 2 + extra, height: inner.height + p * 2 + extra }
 }
 
-/** Draw `source` filling `inner`: the pixels, and where they go. */
-export function render(source: Source, inner: Rect): { canvas: HTMLCanvasElement; rect: Rect } {
+/**
+ * Draw `source` filling `inner`, turned `angle` degrees about its centre: the
+ * pixels, and where they go. Turned, the pixels are the upright drawing
+ * rotated into the box that holds it, so `rect` stays square to the canvas.
+ */
+export function render(source: Source, inner: Rect, angle = 0, flip: Flip = NO_FLIP): { canvas: HTMLCanvasElement; rect: Rect } {
+  const upright = mirrored(renderUpright(source, inner), flip)
+  if (!turned(angle)) return upright
+  const { canvas: src, rect: r } = upright
+  const a = (angle * Math.PI) / 180
+  const cos = Math.abs(Math.cos(a)), sin = Math.abs(Math.sin(a))
+  const width = Math.ceil(r.width * cos + r.height * sin) + 2
+  const height = Math.ceil(r.width * sin + r.height * cos) + 2
+  const cx = r.x + r.width / 2, cy = r.y + r.height / 2
+  const rect = { x: Math.round(cx - width / 2), y: Math.round(cy - height / 2), width, height }
+  const canvas = makeCanvas(width, height)
+  const ctx = canvas.getContext('2d')!
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.translate(cx - rect.x, cy - rect.y)
+  ctx.rotate(a)
+  ctx.drawImage(src, -r.width / 2, -r.height / 2)
+  src.width = 0
+  src.height = 0
+  return { canvas, rect }
+}
+
+/** The drawing mirrored in place (the same canvas back when there is nothing to mirror). */
+function mirrored(drawn: { canvas: HTMLCanvasElement; rect: Rect }, flip: Flip): { canvas: HTMLCanvasElement; rect: Rect } {
+  if (!flip.h && !flip.v) return drawn
+  const src = drawn.canvas
+  const canvas = makeCanvas(src.width, src.height)
+  const ctx = canvas.getContext('2d')!
+  ctx.translate(flip.h ? src.width : 0, flip.v ? src.height : 0)
+  ctx.scale(flip.h ? -1 : 1, flip.v ? -1 : 1)
+  ctx.drawImage(src, 0, 0)
+  src.width = 0
+  src.height = 0
+  return { canvas, rect: drawn.rect }
+}
+
+/**
+ * The object flipped as it looks on screen. Mirroring a turned object in its
+ * own frame would flip it about a tilted line, so the angle is mirrored too.
+ */
+export function flipped(angle: number, flip: Flip, horizontal: boolean): { angle: number; flip: Flip } {
+  return {
+    angle: turned(angle) ? normalAngle(-angle) : 0,
+    flip: horizontal ? { ...flip, h: !flip.h } : { ...flip, v: !flip.v },
+  }
+}
+
+/** Whether `angle` leaves an object turned at all. */
+export function turned(angle: number): boolean {
+  return Math.round(angle * 100) % 36000 !== 0
+}
+
+/** `angle` as -180 to 180, the way it is shown. */
+export function normalAngle(angle: number): number {
+  const a = ((angle % 360) + 360) % 360
+  return a > 180 ? a - 360 : a
+}
+
+/** Turn (x, y) `angle` degrees clockwise about (cx, cy). */
+export function turnPoint(x: number, y: number, cx: number, cy: number, angle: number): { x: number; y: number } {
+  const a = (angle * Math.PI) / 180
+  const cos = Math.cos(a), sin = Math.sin(a)
+  const dx = x - cx, dy = y - cy
+  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos }
+}
+
+/** The object's upright frame (`inner` plus its pad) and the centre it turns about. */
+export function frameOf(source: Source, inner: Rect): { frame: Rect; cx: number; cy: number } {
+  const frame = rectFor(source, inner)
+  return { frame, cx: frame.x + frame.width / 2, cy: frame.y + frame.height / 2 }
+}
+
+/** The four corners of the object's frame as it sits turned: top-left, top-right, bottom-right, bottom-left. */
+export function turnedCorners(source: Source, inner: Rect, angle: number): { x: number; y: number }[] {
+  const { frame: f, cx, cy } = frameOf(source, inner)
+  return [[f.x, f.y], [f.x + f.width, f.y], [f.x + f.width, f.y + f.height], [f.x, f.y + f.height]]
+    .map(([x, y]) => turnPoint(x, y, cx, cy, angle))
+}
+
+function renderUpright(source: Source, inner: Rect): { canvas: HTMLCanvasElement; rect: Rect } {
   const rect = rectFor(source, inner)
   const canvas = makeCanvas(Math.max(1, rect.width), Math.max(1, rect.height))
   const ctx = canvas.getContext('2d')!
@@ -127,6 +218,30 @@ export function resized(source: Source, inner: Rect, corner: number, px: number,
     h = box.height
   }
   return { source: next, inner: { x: right ? fx : fx - w, y: bottom ? fy : fy - h, width: w, height: h } }
+}
+
+/**
+ * `resized` for an object turned `angle` degrees: the pointer is read in the
+ * object's own upright frame, and the corner opposite the dragged one stays
+ * where it is on the canvas (resizing moves the centre it turns about).
+ */
+export function resizedTurned(source: Source, inner: Rect, angle: number, corner: number, px: number, py: number, shift: boolean): { source: Source; inner: Rect } {
+  if (!turned(angle)) return resized(source, inner, corner, px, py, shift)
+  const was = frameOf(source, inner)
+  const at = turnPoint(px, py, was.cx, was.cy, -angle)
+  const next = resized(source, inner, corner, at.x, at.y, shift)
+  // The fixed corner of the inner box, before and after, as it sits on the canvas.
+  const right = corner === 1 || corner === 2
+  const bottom = corner === 2 || corner === 3
+  const fixed = (r: Rect) => ({ x: right ? r.x : r.x + r.width, y: bottom ? r.y : r.y + r.height })
+  const a = fixed(inner), b = fixed(next.inner)
+  const now = frameOf(next.source, next.inner)
+  const before = turnPoint(a.x, a.y, was.cx, was.cy, angle)
+  const after = turnPoint(b.x, b.y, now.cx, now.cy, angle)
+  return {
+    source: next.source,
+    inner: { ...next.inner, x: Math.round(next.inner.x + before.x - after.x), y: Math.round(next.inner.y + before.y - after.y) },
+  }
 }
 
 /** Copy of part of a canvas, `r` may run off its edges. */

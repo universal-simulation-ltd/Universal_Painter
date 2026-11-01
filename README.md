@@ -23,12 +23,16 @@ Live at **[opensource.unisim.co.uk/painter](https://opensource.unisim.co.uk/pain
 - **Objects stay movable.** Boxes, ellipses, lines, text, pastes and QR codes
   can be clicked with Select later, moved, resized from the corner handles
   (pictures and text keep their proportions; Shift changes that), and
-  restyled (shape style, line width, colour). One painted over with the pencil,
+  restyled (shape style, line width, colour). Drag the round arrow above a
+  picked-up object to turn it to any angle (Shift: 15° steps; it settles on
+  upright and the quarter turns), or type the angle, and flip it left to right
+  or top to bottom from the options row. One painted over with the pencil,
   brush, eraser or fill becomes paint, as in Paint. Undo keeps them movable.
 - **QR codes:** type a link and a QR code lands on the canvas like a paste,
   drawn by the suite's shared `@unisim/qr` (as in Universal QR and PDF).
 - **The whole picture:** resize it (by percentage or pixels), change the canvas
-  size (with an anchor), rotate left/right/180°, flip, and a few one-tap photo
+  size (with an anchor), rotate left/right/180° or **freely** (drag a round
+  arrow or type an angle; the canvas grows to keep the corners), flip, and a few one-tap photo
   fixes: brightness and contrast, black and white, invert colours.
 - **Undo and redo**, for every step, kept to a memory budget rather than a
   count (smaller on phones and tablets).

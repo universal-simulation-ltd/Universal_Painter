@@ -35,8 +35,10 @@ export const PlusIcon = () => <Svg size={18}><path d="M12 5v14M5 12h14" /></Svg>
 export const MinusIcon = () => <Svg size={18}><path d="M5 12h14" /></Svg>
 export const RotateLeftIcon = () => <Svg><path d="M4 4v5h5" /><path d="M4.5 9A8 8 0 1 1 6 16.5" /></Svg>
 export const RotateRightIcon = () => <Svg><path d="M20 4v5h-5" /><path d="M19.5 9A8 8 0 1 0 18 16.5" /></Svg>
-export const FlipHIcon = () => <Svg><path d="M12 3v18" strokeDasharray="2 2" /><path d="M9 7L3 17h6z" /><path d="M15 7l6 10h-6z" /></Svg>
-export const FlipVIcon = () => <Svg><path d="M3 12h18" strokeDasharray="2 2" /><path d="M7 9L17 3v6z" /><path d="M7 15l10 6v-6z" /></Svg>
+/** Turn by any angle: the round arrow by a picked-up object, and Rotate freely. */
+export const TurnIcon = ({ size = 22 }: { size?: number }) => <Svg size={size}><path d="M20 4v5h-5" /><path d="M19.5 9A8 8 0 1 0 20 13" /></Svg>
+export const FlipHIcon = ({ size = 22 }: { size?: number }) => <Svg size={size}><path d="M12 3v18" strokeDasharray="2 2" /><path d="M9 7L3 17h6z" /><path d="M15 7l6 10h-6z" /></Svg>
+export const FlipVIcon = ({ size = 22 }: { size?: number }) => <Svg size={size}><path d="M3 12h18" strokeDasharray="2 2" /><path d="M7 9L17 3v6z" /><path d="M7 15l10 6v-6z" /></Svg>
 export const CropIcon = () => <Svg><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M2 6h14a2 2 0 0 1 2 2v14" /></Svg>
 export const ResizeIcon = () => <Svg><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></Svg>
 export const CanvasIcon = () => <Svg><rect x="3" y="3" width="18" height="18" rx="1.5" strokeDasharray="3 2.5" /><rect x="7" y="7" width="10" height="10" rx="1" /></Svg>

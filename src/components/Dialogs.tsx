@@ -4,13 +4,14 @@
 // One `Sheet` for all of them: a centred card on a computer, a sheet from the
 // bottom on a phone. Esc, the backdrop and Cancel close it.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { doc } from '../lib/doc'
+import { doc, turnedSize } from '../lib/doc'
+import { normalAngle } from '../lib/objects'
 import { cropToSelection, newBlank, save, showFit } from '../lib/actions'
 import { makeCanvas, MAX_PIXELS, stemOf, type SaveFormat } from '../lib/imageFiles'
 import { brightnessContrast } from '../lib/pixels'
 import { usePaintStore } from '../stores/paintStore'
 import { useT } from '../i18n'
-import { CanvasIcon, CropIcon, FlipHIcon, FlipVIcon, GreyIcon, InvertIcon, ResizeIcon, RotateLeftIcon, RotateRightIcon, SunIcon } from './icons'
+import { CanvasIcon, CropIcon, FlipHIcon, FlipVIcon, GreyIcon, InvertIcon, ResizeIcon, RotateLeftIcon, RotateRightIcon, SunIcon, TurnIcon } from './icons'
 
 // The QR library only downloads when someone asks for a code.
 const QrDialog = lazy(() => import('./QrDialog'))
@@ -24,6 +25,7 @@ export default function Dialogs() {
     case 'resize': return <ResizeDialog onClose={close} />
     case 'canvas': return <CanvasDialog onClose={close} />
     case 'adjust': return <AdjustDialog onClose={close} />
+    case 'rotate': return <RotateDialog onClose={close} />
     case 'new': return <NewDialog onClose={close} />
     case 'save': return <SaveDialog onClose={close} />
     case 'qr': return <Suspense fallback={null}><QrDialog onClose={close} /></Suspense>
@@ -69,6 +71,7 @@ function PictureMenu({ onClose }: { onClose: () => void }) {
     { icon: <RotateLeftIcon />, label: t('picture.rotate_left'), onClick: run(() => { doc.rotate(3); showFit() }) },
     { icon: <RotateRightIcon />, label: t('picture.rotate_right'), onClick: run(() => { doc.rotate(1); showFit() }) },
     { icon: <RotateRightIcon />, label: t('picture.rotate_180'), onClick: run(() => doc.rotate(2)) },
+    { icon: <TurnIcon />, label: t('picture.rotate_free'), onClick: () => setDialog('rotate') },
     { icon: <FlipHIcon />, label: t('picture.flip_h'), onClick: run(() => doc.flip(true)) },
     { icon: <FlipVIcon />, label: t('picture.flip_v'), onClick: run(() => doc.flip(false)) },
     { icon: <SunIcon />, label: t('picture.adjust'), onClick: () => setDialog('adjust') },
@@ -282,6 +285,123 @@ function AdjustDialog({ onClose }: { onClose: () => void }) {
       </div>
       {slider(t('dialogs.brightness'), b, setB)}
       {slider(t('dialogs.contrast'), c, setC)}
+    </Sheet>
+  )
+}
+
+/** The square the turning picture is previewed in, in CSS pixels. */
+const TURN_BOX = 240
+
+/**
+ * Turn the whole picture by any angle (James, 2026-11-01): a preview with the
+ * round arrow beside it to drag, and the angle to type. The canvas grows to
+ * hold the turned picture.
+ */
+function RotateDialog({ onClose }: { onClose: () => void }) {
+  const t = useT()
+  const secondary = usePaintStore((s) => s.secondary)
+  const [angle, setAngle] = useState(0)
+  const [fillSecond, setFillSecond] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLCanvasElement>(null)
+  const dragging = useRef(false)
+  const ow = doc.width, oh = doc.height
+  // A small copy, turned with CSS, so dragging never touches the picture.
+  useEffect(() => {
+    const p = previewRef.current, src = doc.canvas
+    if (!p || !src) return
+    const k = Math.min(1, 480 / Math.max(src.width, src.height))
+    p.width = Math.max(1, Math.round(src.width * k))
+    p.height = Math.max(1, Math.round(src.height * k))
+    p.getContext('2d')!.drawImage(src, 0, 0, p.width, p.height)
+  }, [])
+  // Sized so its diagonal fits: the same size at every angle, with room for the arrow.
+  const k = (TURN_BOX - 76) / Math.max(1, Math.hypot(ow, oh))
+  const size = turnedSize(ow, oh, angle)
+  const tooBig = size.width * size.height > MAX_PIXELS || Math.max(size.width, size.height) > 16384
+  const set = (a: number) => setAngle(normalAngle(Math.round(a)))
+  const turnTo = (clientX: number, clientY: number, shift: boolean) => {
+    const r = boxRef.current?.getBoundingClientRect()
+    if (!r) return
+    let a = normalAngle((Math.atan2(clientY - (r.top + r.height / 2), clientX - (r.left + r.width / 2)) * 180) / Math.PI + 90)
+    // As on the canvas: Shift turns in 15° steps, else it settles on upright and the quarter turns.
+    if (shift) a = Math.round(a / 15) * 15
+    else {
+      const quarter = Math.round(a / 90) * 90
+      if (Math.abs(a - quarter) < 4) a = quarter
+    }
+    set(a)
+  }
+  const apply = () => {
+    if (tooBig) return
+    doc.rotateBy(angle, fillSecond ? secondary : null)
+    showFit()
+    onClose()
+  }
+  return (
+    <Sheet
+      title={t('dialogs.rotate_title')}
+      onClose={onClose}
+      footer={<>
+        <button type="button" className="pt-btn pt-btn-ghost" onClick={() => setAngle(0)}>{t('dialogs.reset')}</button>
+        <button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="pt-btn pt-btn-primary" disabled={tooBig || angle === 0} onClick={apply}>{t('common.apply')}</button>
+      </>}
+    >
+      <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t('dialogs.rotate_lead')}</p>
+      <div ref={boxRef} className="relative mx-auto overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800" style={{ width: TURN_BOX, height: TURN_BOX }}>
+        <div className="absolute left-1/2 top-1/2" style={{ width: ow * k, height: oh * k, transform: `translate(-50%, -50%) rotate(${angle}deg)` }}>
+          <canvas ref={previewRef} className="pt-checker block h-full w-full shadow-[0_1px_6px_rgba(15,23,42,0.3)]" style={{ backgroundSize: '12px 12px' }} />
+          <div aria-hidden="true" className="pt-turn-stem absolute left-1/2" style={{ top: -17, height: 17 }} />
+          <button
+            type="button"
+            role="slider"
+            aria-label={t('dialogs.turn_handle')}
+            aria-valuemin={-180}
+            aria-valuemax={180}
+            aria-valuenow={angle}
+            aria-valuetext={`${angle}°`}
+            data-turn-handle
+            className="pt-turn absolute left-1/2"
+            style={{ top: -30, cursor: 'grab', touchAction: 'none' }}
+            onPointerDown={(e) => { e.preventDefault(); dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId) }}
+            onPointerMove={(e) => { if (dragging.current) turnTo(e.clientX, e.clientY, e.shiftKey) }}
+            onPointerUp={() => { dragging.current = false }}
+            onPointerCancel={() => { dragging.current = false }}
+            onKeyDown={(e) => {
+              const step = e.shiftKey ? 15 : 1
+              if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); set(angle + step) }
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); set(angle - step) }
+              if (e.key === 'Home') { e.preventDefault(); set(0) }
+            }}
+          >
+            <TurnIcon size={16} />
+          </button>
+        </div>
+      </div>
+      <label className="mt-4 flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+        {t('dialogs.angle')}
+        <span className="flex items-center gap-3">
+          <input type="range" min={-180} max={180} value={angle} onChange={(e) => set(Number(e.target.value))} className="pt-range w-full" aria-valuetext={`${angle}°`} />
+          <span className="flex items-center gap-1">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={-180}
+              max={180}
+              value={angle}
+              onChange={(e) => { const n = Number(e.target.value); if (e.target.value !== '' && Number.isFinite(n)) set(n) }}
+              className="pt-input w-20 tabular-nums"
+              aria-label={t('dialogs.angle')}
+            />
+            <span className="text-slate-500">°</span>
+          </span>
+        </span>
+      </label>
+      <Check label={t('dialogs.fill_corners')} checked={fillSecond} onChange={setFillSecond} />
+      <p className={`mt-3 text-xs ${tooBig ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+        {tooBig ? t('dialogs.too_big', { max: new Intl.NumberFormat(t.locale).format(MAX_PIXELS) }) : `${ow} × ${oh} → ${size.width} × ${size.height}`}
+      </p>
     </Sheet>
   )
 }

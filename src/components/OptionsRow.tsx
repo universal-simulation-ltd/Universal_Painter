@@ -6,10 +6,11 @@
 // slid back left only as far as they need to fit.
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { doc } from '../lib/doc'
-import { copySelection, cropToSelection, cutSelection, deleteSelection, deselect, pasteFromButton, selectAll } from '../lib/actions'
+import { copySelection, cropToSelection, cutSelection, deleteSelection, deselect, flipFloating, pasteFromButton, selectAll, turnFloating } from '../lib/actions'
+import { normalAngle } from '../lib/objects'
 import { sizeKey, usePaintStore, type ShapeStyle, type Tool } from '../stores/paintStore'
 import { useT } from '../i18n'
-import { CopyIcon, CropIcon, CutIcon, PasteIcon, TrashIcon } from './icons'
+import { CopyIcon, CropIcon, CutIcon, FlipHIcon, FlipVIcon, PasteIcon, TrashIcon, TurnIcon } from './icons'
 
 const SIZE_MAX = { pencil: 16, brush: 120, eraser: 200, shape: 60 } as const
 
@@ -114,6 +115,7 @@ export default function OptionsRow() {
           <SmallBtn label={t('options.select_all')} onClick={selectAll} />
           {sel && <SmallBtn label={t('options.deselect')} onClick={deselect} />}
         </div>
+        {doc.floating && <TurnControls angle={doc.floating.angle} />}
         {shapeControls}
         {sel && <Hint>{t(doc.floating ? 'options.object_hint' : 'options.move_hint')}</Hint>}
       </>
@@ -159,6 +161,36 @@ function useUnderTool(tool: Tool) {
     }
   }, [tool])
   return { box, inner, offset }
+}
+
+/**
+ * The picked-up object's angle, to type instead of dragging the round arrow,
+ * and its two flips (James, 2026-11-01).
+ */
+function TurnControls({ angle }: { angle: number }) {
+  const t = useT()
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <label className="flex items-center gap-1.5" title={t('options.angle_tip')}>
+        <span className="text-slate-500 dark:text-slate-400"><TurnIcon size={18} /></span>
+        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{t('options.angle')}</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={-180}
+          max={180}
+          value={Math.round(angle)}
+          onChange={(e) => { const n = Number(e.target.value); if (e.target.value !== '' && Number.isFinite(n)) turnFloating(normalAngle(Math.round(n))) }}
+          className="pt-input w-16 py-1 text-xs tabular-nums"
+          data-turn-input
+        />
+        <span className="text-xs text-slate-600 dark:text-slate-300">°</span>
+      </label>
+      {angle !== 0 && <SmallBtn label={t('options.upright')} onClick={() => turnFloating(0)} />}
+      <SmallBtn icon={<FlipHIcon size={18} />} label={t('options.flip_h')} onClick={() => flipFloating(true)} />
+      <SmallBtn icon={<FlipVIcon size={18} />} label={t('options.flip_v')} onClick={() => flipFloating(false)} />
+    </div>
+  )
 }
 
 function Segmented<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {

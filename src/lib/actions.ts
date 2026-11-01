@@ -3,6 +3,7 @@
 import { saveBlob } from '@unisim/media/save'
 import { readDefaultView } from '@unisim/sdk'
 import { doc } from './doc'
+import { flipped } from './objects'
 import { getT } from '../i18n/runtime'
 import { encodePicture, fitWithinLimits, looksLikeImage, makeCanvas, openPicture, readClipboardPicture, saveName, writeClipboardPicture, type SaveFormat } from './imageFiles'
 import { usePaintStore } from '../stores/paintStore'
@@ -163,6 +164,25 @@ export function floatPicture(canvas: HTMLCanvasElement) {
   doc.float(canvas, x, y)
   const f = doc.floating
   if (f) store().setSelection({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })
+}
+
+/** Turn the object picked up with Select to `angle` degrees (the round arrow, or the angle box). */
+export function turnFloating(angle: number) {
+  const f = doc.floating
+  if (!f) return
+  doc.reshapeFloating(f.source, f.inner, angle)
+  const g = doc.floating
+  if (g) store().setSelection({ x: g.x, y: g.y, width: g.canvas.width, height: g.canvas.height })
+}
+
+/** Flip the object picked up with Select, as it looks on screen. */
+export function flipFloating(horizontal: boolean) {
+  const f = doc.floating
+  if (!f) return
+  const next = flipped(f.angle, f.flip, horizontal)
+  doc.reshapeFloating(f.source, f.inner, next.angle, next.flip)
+  const g = doc.floating
+  if (g) store().setSelection({ x: g.x, y: g.y, width: g.canvas.width, height: g.canvas.height })
 }
 
 /** What Copy put away when the system clipboard refused a picture. */

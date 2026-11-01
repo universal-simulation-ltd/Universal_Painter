@@ -6,7 +6,7 @@
 // canvas itself when they draw.
 import { History, type Surface } from './history'
 import { makeCanvas, stepDown } from './imageFiles'
-import { capture, contains, intersect, overlaps, render, type Item, type Source } from './objects'
+import { capture, contains, intersect, NO_FLIP, normalAngle, overlaps, render, turned, type Flip, type Item, type Source } from './objects'
 import { anchorOffset, brightnessContrast, clampRect, greyscale, invert, unionRect, type Rect } from './pixels'
 
 /** Undo memory: generous on a computer, careful on a phone or tablet. */
@@ -25,6 +25,9 @@ export interface Floating {
   /** What it is, so a resize or restyle draws it again (objects.ts). */
   source: Source
   inner: Rect
+  /** Degrees it is turned clockwise about its centre; 0 is upright. */
+  angle: number
+  flip: Flip
 }
 
 /** How many objects stay movable; the oldest becomes plain paint first. */
@@ -182,15 +185,15 @@ class PaintDoc {
   // ── Movable objects (objects.ts) ─────────────────────────────────────────
 
   /** Put a new object down: a box, ellipse, line or text, as one undo step. */
-  placeItem(source: Source, inner: Rect) {
+  placeItem(source: Source, inner: Rect, angle = 0, flip: Flip = NO_FLIP) {
     const s = this.surface
     if (!s) return
     this.settle()
     this.begin()
-    const { canvas, rect } = render(source, inner)
+    const { canvas, rect } = render(source, inner, angle, flip)
     const under = capture(s.canvas, rect)
     s.ctx.drawImage(canvas, rect.x, rect.y)
-    this.commit(rect, { add: { source, inner, rect, pixels: canvas, under } })
+    this.commit(rect, { add: { source, inner, angle, flip, rect, pixels: canvas, under } })
   }
 
   /**
@@ -206,7 +209,7 @@ class PaintDoc {
     this.surface = back.surface
     this.items = back.items
     // placeItem's commit pushes a new step, which clears the undone one from redo.
-    this.placeItem(source, last.inner)
+    this.placeItem(source, last.inner, last.angle, last.flip)
     return true
   }
 
@@ -234,17 +237,17 @@ class PaintDoc {
       s.ctx.drawImage(later.pixels, later.rect.x, later.rect.y)
     }
     this.items = kept
-    this.floating = { canvas: item.pixels, x: item.rect.x, y: item.rect.y, from: item.rect, source: item.source, inner: item.inner }
+    this.floating = { canvas: item.pixels, x: item.rect.x, y: item.rect.y, from: item.rect, source: item.source, inner: item.inner, angle: item.angle, flip: item.flip }
     this.changed(false)
     return this.floating
   }
 
-  /** Draw the floating object again at a new size or in a new style. */
-  reshapeFloating(source: Source, inner: Rect) {
+  /** Draw the floating object again at a new size, in a new style, turned or flipped. */
+  reshapeFloating(source: Source, inner: Rect, angle = this.floating?.angle ?? 0, flip = this.floating?.flip ?? NO_FLIP) {
     const f = this.floating
     if (!f) return
-    const { canvas, rect } = render(source, inner)
-    this.floating = { ...f, canvas, x: rect.x, y: rect.y, source, inner }
+    const { canvas, rect } = render(source, inner, angle, flip)
+    this.floating = { ...f, canvas, x: rect.x, y: rect.y, source, inner, angle, flip }
     this.changed(false)
   }
 
@@ -326,6 +329,32 @@ class PaintDoc {
     this.replace(next)
   }
 
+  /**
+   * Turn the whole picture `degrees` clockwise. The canvas grows to hold the
+   * turned picture, so no corner is cut off; the new corners are see-through,
+   * or `background`.
+   */
+  rotateBy(degrees: number, background: string | null) {
+    const s = this.surface
+    if (!s) return
+    const a = normalAngle(degrees)
+    if (!turned(a)) return
+    if (a === 90 || a === -90 || a === 180) { this.rotate(a === 90 ? 1 : a === 180 ? 2 : 3); return }
+    this.settle()
+    const { width: w, height: h } = s.canvas
+    const size = turnedSize(w, h, a)
+    const next = makeCanvas(size.width, size.height)
+    const ctx = next.getContext('2d')!
+    if (background) { ctx.fillStyle = background; ctx.fillRect(0, 0, next.width, next.height) }
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.translate(next.width / 2, next.height / 2)
+    ctx.rotate((a * Math.PI) / 180)
+    if (background) ctx.clearRect(-w / 2, -h / 2, w, h)
+    ctx.drawImage(s.canvas, -w / 2, -h / 2)
+    this.replace(next)
+  }
+
   flip(horizontal: boolean) {
     const s = this.surface
     if (!s) return
@@ -395,7 +424,7 @@ class PaintDoc {
       // Objects partly lifted are paint now: their pixels went with the lift.
       this.items = this.withBaked(this.items, new Set(this.items.flatMap((it, i) => (overlaps(it.rect, r) ? [i] : []))))
     }
-    this.floating = { canvas: c, x: r.x, y: r.y, from: r, source: { kind: 'image', canvas: c }, inner: r }
+    this.floating = { canvas: c, x: r.x, y: r.y, from: r, source: { kind: 'image', canvas: c }, inner: r, angle: 0, flip: NO_FLIP }
     this.changed(false)
     return this.floating
   }
@@ -413,7 +442,7 @@ class PaintDoc {
     this.begin()
     this.starter = false
     const inner = { x: Math.round(x), y: Math.round(y), width: canvas.width, height: canvas.height }
-    this.floating = { canvas, x: inner.x, y: inner.y, from: null, source: { kind: 'image', canvas }, inner }
+    this.floating = { canvas, x: inner.x, y: inner.y, from: null, source: { kind: 'image', canvas }, inner, angle: 0, flip: NO_FLIP }
     this.changed(false)
   }
 
@@ -436,7 +465,7 @@ class PaintDoc {
     const to = { x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height }
     const under = capture(s.canvas, to)
     s.ctx.drawImage(f.canvas, f.x, f.y)
-    this.commit(unionRect(f.from, to), { add: { source: f.source, inner: f.inner, rect: to, pixels: f.canvas, under } })
+    this.commit(unionRect(f.from, to), { add: { source: f.source, inner: f.inner, angle: f.angle, flip: f.flip, rect: to, pixels: f.canvas, under } })
   }
 
   /** Drop the floating object: what it was lifted from stays as it is now, a paste vanishes. */
@@ -519,4 +548,12 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
 function putBack(ctx: CanvasRenderingContext2D, it: Item) {
   ctx.clearRect(it.rect.x, it.rect.y, it.rect.width, it.rect.height)
   ctx.drawImage(it.under, it.rect.x, it.rect.y)
+}
+
+/** The canvas a `w` × `h` picture needs once turned `degrees`, corners and all. */
+export function turnedSize(w: number, h: number, degrees: number): { width: number; height: number } {
+  const a = (degrees * Math.PI) / 180
+  const cos = Math.abs(Math.cos(a)), sin = Math.abs(Math.sin(a))
+  // A hair under a whole pixel is rounding, not a pixel more.
+  return { width: Math.max(1, Math.ceil(w * cos + h * sin - 1e-6)), height: Math.max(1, Math.ceil(w * sin + h * cos - 1e-6)) }
 }

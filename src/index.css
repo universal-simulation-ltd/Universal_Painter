@@ -132,3 +132,29 @@ body {
 }
 .pt-viewport[data-handle='nwse'] { cursor: nwse-resize; }
 .pt-viewport[data-handle='nesw'] { cursor: nesw-resize; }
+
+/* The round arrow above the selected object (drag it to turn the object). */
+.pt-turn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  background: #fff;
+  color: #e05504;
+  border: 1.5px solid #e05504;
+  border-radius: 9999px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+}
+.pt-turn-stem {
+  width: 0;
+  margin-left: -0.75px;
+  border-left: 1.5px solid #e05504;
+  transform-origin: top center;
+}
+@media (pointer: coarse) {
+  .pt-turn { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+}
+.pt-viewport[data-handle='turn'] { cursor: grab; }
+.pt-viewport[data-turning='true'] { cursor: grabbing; }

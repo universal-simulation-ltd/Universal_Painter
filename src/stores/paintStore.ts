@@ -19,7 +19,7 @@ export const TOOLS: Tool[] = ['pencil', 'brush', 'eraser', 'fill', 'line', 'box'
 /** Outline only, filled only, or an outline in the first colour round a fill in the second. */
 export type ShapeStyle = 'outline' | 'fill' | 'both'
 
-export type Dialog = null | 'new' | 'resize' | 'canvas' | 'adjust' | 'image' | 'save' | 'qr'
+export type Dialog = null | 'new' | 'resize' | 'canvas' | 'adjust' | 'rotate' | 'image' | 'save' | 'qr'
 
 interface PaintState {
   tool: Tool

@@ -7,14 +7,15 @@
 // as the picture, and are only painted into the picture when the pointer
 // lifts — one undo step per gesture.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { doc } from '../lib/doc'
+import { doc, type Floating } from '../lib/doc'
 import { brushLine, drawLine, drawShape, fontFor, LINE_HEIGHT, pencilLine, type ShapeInk } from '../lib/draw'
-import { contains, resized, textInner, type Source } from '../lib/objects'
+import { contains, frameOf, normalAngle, resizedTurned, textInner, turnedCorners, turnPoint, type Source } from '../lib/objects'
 import { floodFill, parseHex, rectFromPoints, snap45, squareUp, toHex, unionRect, type Rect } from '../lib/pixels'
-import { showOpening, viewport, zoomBy } from '../lib/actions'
+import { showOpening, turnFloating, viewport, zoomBy } from '../lib/actions'
 import { usePaintStore, type Tool } from '../stores/paintStore'
 import { useSettings } from '../stores/settingsStore'
 import { useT } from '../i18n'
+import { TurnIcon } from './icons'
 
 type Pt = { x: number; y: number }
 
@@ -24,7 +25,9 @@ type Gesture =
   | { kind: 'select'; id: number; start: Pt }
   | { kind: 'move'; id: number; grab: Pt; origin: Pt }
   /** A corner handle of the selected object: 0 top-left, 1 top-right, 2 bottom-right, 3 bottom-left. */
-  | { kind: 'resize'; id: number; corner: number; source: Source; inner: Rect }
+  | { kind: 'resize'; id: number; corner: number; source: Source; inner: Rect; angle: number }
+  /** The round arrow above the selected object, turning it about its centre (cx, cy). */
+  | { kind: 'turn'; id: number; cx: number; cy: number }
   | { kind: 'pan'; id: number; from: Pt; panX: number; panY: number }
   | { kind: 'pinch'; ids: [number, number]; dist: number; mid: Pt; zoom: number; panX: number; panY: number }
 
@@ -72,6 +75,27 @@ function restyled(source: Source, s: ReturnType<typeof usePaintStore.getState>, 
 /** How near a corner handle a press has to land, in screen pixels. */
 const HANDLE_REACH = { mouse: 9, touch: 22 }
 
+/**
+ * The round arrow to turn the selected object (James, 2026-11-01: "an icon
+ * next to the image to control the degree of rotation"): how far above the
+ * object's top edge it sits, and how near a press has to land, in screen pixels.
+ */
+const TURN_GAP = { mouse: 30, touch: 40 }
+const TURN_REACH = { mouse: 14, touch: 24 }
+
+/** Coarse pointers (fingers) get the bigger handles, as the CSS does. */
+const coarse = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
+
+/** Where the turn arrow of `f` sits on screen, and the middle of the top edge it hangs from. */
+function turnHandle(f: Floating, zoom: number, panX: number, panY: number) {
+  const gap = coarse() ? TURN_GAP.touch : TURN_GAP.mouse
+  const { frame, cx, cy } = frameOf(f.source, f.inner)
+  const top = turnPoint(cx, frame.y, cx, cy, f.angle)
+  const a = (f.angle * Math.PI) / 180
+  const fromX = panX + top.x * zoom, fromY = panY + top.y * zoom
+  return { x: fromX + Math.sin(a) * gap, y: fromY - Math.cos(a) * gap, fromX, fromY, gap }
+}
+
 /** The ink a shape is drawn with; a right-button shape swaps the two colours. */
 function inkFor(s: ReturnType<typeof usePaintStore.getState>, tool: ShapeTool, swapped: boolean): ShapeInk {
   return {
@@ -110,6 +134,7 @@ export default function Editor() {
   const textBoxRef = useRef<TextBox | null>(null)
   textBoxRef.current = textBox
   const [panning, setPanning] = useState(false)
+  const [turning, setTurning] = useState(false)
 
   const w = doc.width
   const h = doc.height
@@ -249,10 +274,19 @@ export default function Editor() {
     const at = local(clientX, clientY)
     const { zoom, panX, panY } = usePaintStore.getState()
     const reach = pointerType === 'mouse' ? HANDLE_REACH.mouse : HANDLE_REACH.touch
-    const corners = [
-      [f.x, f.y], [f.x + f.canvas.width, f.y], [f.x + f.canvas.width, f.y + f.canvas.height], [f.x, f.y + f.canvas.height],
-    ]
-    return corners.findIndex(([cx, cy]) => Math.abs(panX + cx * zoom - at.x) <= reach && Math.abs(panY + cy * zoom - at.y) <= reach)
+    // The corners of the object as it sits, turned or not.
+    return turnedCorners(f.source, f.inner, f.angle)
+      .findIndex((c) => Math.abs(panX + c.x * zoom - at.x) <= reach && Math.abs(panY + c.y * zoom - at.y) <= reach)
+  }
+
+  /** Whether a screen point is on the floating object's turn arrow. */
+  const onTurnHandle = (clientX: number, clientY: number, pointerType: string): boolean => {
+    const f = doc.floating
+    if (!f || usePaintStore.getState().tool !== 'select') return false
+    const at = local(clientX, clientY)
+    const { zoom, panX, panY } = usePaintStore.getState()
+    const th = turnHandle(f, zoom, panX, panY)
+    return Math.hypot(th.x - at.x, th.y - at.y) <= (pointerType === 'mouse' ? TURN_REACH.mouse : TURN_REACH.touch)
   }
 
   // ── Pointer handling ───────────────────────────────────────────────────
@@ -365,9 +399,15 @@ export default function Editor() {
         const f = doc.floating
         const sel = s.selection
         const inside = (r: Rect) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.width && p.y <= r.y + r.height
+        if (f && onTurnHandle(e.clientX, e.clientY, e.pointerType)) {
+          const { cx, cy } = frameOf(f.source, f.inner)
+          gesture.current = { kind: 'turn', id: e.pointerId, cx, cy }
+          setTurning(true)
+          return
+        }
         const corner = handleAt(e.clientX, e.clientY, e.pointerType)
         if (f && corner >= 0) {
-          gesture.current = { kind: 'resize', id: e.pointerId, corner, source: f.source, inner: f.inner }
+          gesture.current = { kind: 'resize', id: e.pointerId, corner, source: f.source, inner: f.inner, angle: f.angle }
           return
         }
         if (f && inside({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })) {
@@ -465,10 +505,23 @@ export default function Editor() {
     if (g.kind === 'resize') {
       // Always from the object as it was when the handle was grabbed, so text
       // sizes and rounding never compound.
-      const next = resized(g.source, g.inner, g.corner, p.x, p.y, e.shiftKey)
+      const next = resizedTurned(g.source, g.inner, g.angle, g.corner, p.x, p.y, e.shiftKey)
       doc.reshapeFloating(next.source, next.inner)
       const f = doc.floating
       if (f) s.setSelection({ x: f.x, y: f.y, width: f.canvas.width, height: f.canvas.height })
+      return
+    }
+    if (g.kind === 'turn') {
+      // Straight up from the centre is 0°. Whole degrees; Shift turns in 15°
+      // steps, and without it the object settles on upright and the quarter
+      // turns when it comes within a few degrees of them.
+      let a = normalAngle((Math.atan2(p.y - g.cy, p.x - g.cx) * 180) / Math.PI + 90)
+      if (e.shiftKey) a = Math.round(a / 15) * 15
+      else {
+        const quarter = Math.round(a / 90) * 90
+        if (Math.abs(a - quarter) < 4) a = quarter
+      }
+      turnFloating(normalAngle(Math.round(a)))
     }
   }
 
@@ -479,14 +532,16 @@ export default function Editor() {
     const s = usePaintStore.getState()
     let movable = false
     let corner = -1
+    let turn = false
     if (s.tool === 'select') {
       const p = toDoc(e.clientX, e.clientY)
       const sel = s.selection
+      turn = onTurnHandle(e.clientX, e.clientY, e.pointerType)
       corner = handleAt(e.clientX, e.clientY, e.pointerType)
       movable = (!!sel && contains(sel, p.x, p.y)) || doc.itemAt(p.x, p.y) >= 0
     }
     el.dataset.movable = movable ? 'true' : ''
-    el.dataset.handle = corner < 0 ? '' : corner % 2 === 0 ? 'nwse' : 'nesw'
+    el.dataset.handle = turn ? 'turn' : corner < 0 ? '' : corner % 2 === 0 ? 'nwse' : 'nesw'
   }
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -504,6 +559,7 @@ export default function Editor() {
     if (g.id !== e.pointerId) return
     gesture.current = null
     setPanning(false)
+    setTurning(false)
     if (!doc.surface) return
     if (g.kind === 'paint') {
       doc.commit(g.dirty)
@@ -526,6 +582,7 @@ export default function Editor() {
       else abandon()
       gesture.current = null
       setPanning(false)
+      setTurning(false)
     }
   }
 
@@ -578,6 +635,7 @@ export default function Editor() {
       onPointerCancel={onPointerCancel}
       onContextMenu={(e) => e.preventDefault()}
       data-version={version}
+      data-turning={turning ? 'true' : undefined}
     >
       <div
         className="absolute left-0 top-0 origin-top-left"
@@ -602,7 +660,7 @@ export default function Editor() {
         />
       )}
 
-      {selection && (
+      {selection && !floating && (
         <div
           className="pt-marquee pointer-events-none absolute"
           style={{
@@ -612,20 +670,9 @@ export default function Editor() {
             height: selection.height * zoom + 2,
             cursor: 'move',
           }}
-          data-floating={floating ? 'true' : undefined}
         />
       )}
-      {selection && floating && tool === 'select' && (
-        [[0, 0], [1, 0], [1, 1], [0, 1]].map(([cx, cy], i) => (
-          <div
-            key={i}
-            aria-hidden="true"
-            data-handle-corner={i}
-            className="pt-handle pointer-events-none absolute"
-            style={{ left: panX + (selection.x + cx * selection.width) * zoom, top: panY + (selection.y + cy * selection.height) * zoom }}
-          />
-        ))
-      )}
+      {selection && floating && <ObjectFrame f={floating} zoom={zoom} panX={panX} panY={panY} handles={tool === 'select'} turning={turning} />}
 
       {textBox && (
         <textarea
@@ -654,5 +701,61 @@ export default function Editor() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * The picked-up object's outline, turned with it, with a handle on each
+ * corner to resize it and the round arrow above it to turn it. While it is
+ * being turned the angle shows by the arrow.
+ */
+function ObjectFrame({ f, zoom, panX, panY, handles, turning }: { f: Floating; zoom: number; panX: number; panY: number; handles: boolean; turning: boolean }) {
+  const { frame, cx, cy } = frameOf(f.source, f.inner)
+  const th = turnHandle(f, zoom, panX, panY)
+  const turn = f.angle ? `rotate(${f.angle}deg)` : undefined
+  return (
+    <>
+      <div
+        className="pt-marquee pointer-events-none absolute"
+        data-floating="true"
+        style={{
+          left: panX + cx * zoom - (frame.width * zoom) / 2 - 1,
+          top: panY + cy * zoom - (frame.height * zoom) / 2 - 1,
+          width: frame.width * zoom + 2,
+          height: frame.height * zoom + 2,
+          transform: turn,
+        }}
+      />
+      {handles && turnedCorners(f.source, f.inner, f.angle).map((c, i) => (
+        <div
+          key={i}
+          aria-hidden="true"
+          data-handle-corner={i}
+          className="pt-handle pointer-events-none absolute"
+          style={{ left: panX + c.x * zoom, top: panY + c.y * zoom, transform: turn }}
+        />
+      ))}
+      {handles && (
+        <>
+          <div
+            aria-hidden="true"
+            className="pt-turn-stem pointer-events-none absolute"
+            style={{ left: th.fromX, top: th.fromY, height: Math.max(0, th.gap - 12), transform: `rotate(${f.angle + 180}deg)` }}
+          />
+          <div aria-hidden="true" data-turn-handle className="pt-turn pointer-events-none absolute" style={{ left: th.x, top: th.y }}>
+            <TurnIcon size={16} />
+          </div>
+          {turning && (
+            <span
+              data-turn-angle
+              className="pointer-events-none absolute rounded-md bg-slate-900/85 px-1.5 py-0.5 text-xs font-medium tabular-nums text-white"
+              style={{ left: th.x + 22, top: th.y - 11 }}
+            >
+              {Math.round(f.angle)}°
+            </span>
+          )}
+        </>
+      )}
+    </>
   )
 }
