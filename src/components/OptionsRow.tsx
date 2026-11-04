@@ -87,7 +87,7 @@ export default function OptionsRow() {
           <input type="checkbox" checked={s.bold} onChange={(e) => s.setBold(e.target.checked)} className="h-4 w-4 accent-orange-600" />
           <span className="font-bold">{t('options.bold')}</span>
         </label>
-        <button type="button" className="pt-btn pt-btn-soft" onClick={() => window.dispatchEvent(new Event('painter:commit-text'))}>
+        <button type="button" className="u-btn u-btn--soft u-btn--sm" onClick={() => window.dispatchEvent(new Event('painter:commit-text'))}>
           {t('common.done')}
         </button>
         <Hint>{t('options.text_hint')}</Hint>

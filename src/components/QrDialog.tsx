@@ -60,8 +60,8 @@ export default function QrDialog({ onClose }: { onClose: () => void }) {
       title={t('qr.title')}
       onClose={onClose}
       footer={<>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
-        <button type="button" className="pt-btn pt-btn-primary" disabled={!data || busy} onClick={() => void place()}>{t('qr.place')}</button>
+        <button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="u-btn u-btn--primary" disabled={!data || busy} onClick={() => void place()}>{t('qr.place')}</button>
       </>}
     >
       <form onSubmit={(e) => { e.preventDefault(); void place() }}>

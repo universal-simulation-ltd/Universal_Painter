@@ -11,7 +11,7 @@ import { makeCanvas, MAX_PIXELS, stemOf, type SaveFormat } from '../lib/imageFil
 import { brightnessContrast } from '../lib/pixels'
 import { usePaintStore } from '../stores/paintStore'
 import { useT } from '../i18n'
-import { CanvasIcon, CropIcon, FlipHIcon, FlipVIcon, GreyIcon, InvertIcon, ResizeIcon, RotateLeftIcon, RotateRightIcon, SunIcon, TurnIcon } from './icons'
+import { CanvasIcon, CropIcon, FlipHIcon, FlipVIcon, GreyIcon, InvertIcon, PlusIcon, ResizeIcon, RotateLeftIcon, RotateRightIcon, SunIcon, TurnIcon } from './icons'
 
 // The QR library only downloads when someone asks for a code.
 const QrDialog = lazy(() => import('./QrDialog'))
@@ -79,7 +79,7 @@ function PictureMenu({ onClose }: { onClose: () => void }) {
     { icon: <InvertIcon />, label: t('picture.invert'), onClick: run(() => doc.invert()) },
   ]
   return (
-    <Sheet title={t('picture.title')} onClose={onClose} footer={<button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.close')}</button>}>
+    <Sheet title={t('picture.title')} onClose={onClose} footer={<button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.close')}</button>}>
       <p className="-mt-2 mb-3 text-xs text-slate-500 dark:text-slate-400">{t('picture.size_now', { w: doc.width, h: doc.height })}</p>
       <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
         {rows.map((r) => (
@@ -155,14 +155,14 @@ function ResizeDialog({ onClose }: { onClose: () => void }) {
       title={t('dialogs.resize_title')}
       onClose={onClose}
       footer={<>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
-        <button type="button" className="pt-btn pt-btn-primary" disabled={tooBig} onClick={apply}>{t('common.apply')}</button>
+        <button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="u-btn u-btn--primary" disabled={tooBig} onClick={apply}>{t('common.apply')}</button>
       </>}
     >
       <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t('dialogs.resize_lead')}</p>
-      <div className="mb-3 inline-flex overflow-hidden rounded-lg border border-slate-300 dark:border-slate-600" role="radiogroup">
+      <div className="u-tabs mb-3" role="radiogroup">
         {(['percent', 'pixels'] as const).map((m) => (
-          <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className="px-3 py-1.5 text-xs text-slate-700 aria-checked:bg-orange-600 aria-checked:text-white dark:text-slate-200">
+          <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={`u-tab ${mode === m ? 'u-tab--current' : ''}`}>
             {t(m === 'percent' ? 'dialogs.percent' : 'dialogs.pixels')}
           </button>
         ))}
@@ -207,8 +207,8 @@ function CanvasDialog({ onClose }: { onClose: () => void }) {
       title={t('dialogs.canvas_title')}
       onClose={onClose}
       footer={<>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
-        <button type="button" className="pt-btn pt-btn-primary" disabled={tooBig} onClick={apply}>{t('common.apply')}</button>
+        <button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="u-btn u-btn--primary" disabled={tooBig} onClick={apply}>{t('common.apply')}</button>
       </>}
     >
       <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t('dialogs.canvas_lead')}</p>
@@ -275,9 +275,9 @@ function AdjustDialog({ onClose }: { onClose: () => void }) {
       title={t('dialogs.adjust_title')}
       onClose={onClose}
       footer={<>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={() => { setB(0); setC(0) }}>{t('dialogs.reset')}</button>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
-        <button type="button" className="pt-btn pt-btn-primary" onClick={apply}>{t('common.apply')}</button>
+        <button type="button" className="u-btn" onClick={() => { setB(0); setC(0) }}>{t('dialogs.reset')}</button>
+        <button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="u-btn u-btn--primary" onClick={apply}>{t('common.apply')}</button>
       </>}
     >
       <div className="pt-checker flex justify-center overflow-hidden rounded-lg" style={{ backgroundSize: '16px 16px' }}>
@@ -343,9 +343,9 @@ function RotateDialog({ onClose }: { onClose: () => void }) {
       title={t('dialogs.rotate_title')}
       onClose={onClose}
       footer={<>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={() => setAngle(0)}>{t('dialogs.reset')}</button>
-        <button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>
-        <button type="button" className="pt-btn pt-btn-primary" disabled={tooBig || angle === 0} onClick={apply}>{t('common.apply')}</button>
+        <button type="button" className="u-btn" onClick={() => setAngle(0)}>{t('dialogs.reset')}</button>
+        <button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>
+        <button type="button" className="u-btn u-btn--primary" disabled={tooBig || angle === 0} onClick={apply}>{t('common.apply')}</button>
       </>}
     >
       <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">{t('dialogs.rotate_lead')}</p>
@@ -446,7 +446,10 @@ export function BlankForm({ onStarted, compact }: { onStarted?: () => void; comp
       </div>
       {tooBig && <p className="text-xs text-red-600 dark:text-red-400">{t('dialogs.too_big', { max: new Intl.NumberFormat(t.locale).format(MAX_PIXELS) })}</p>}
       <div>
-        <button type="submit" disabled={tooBig} className="pt-btn pt-btn-primary">{t('landing.start')}</button>
+        <button type="submit" disabled={tooBig} className="u-btn u-btn--primary">
+          <span className="u-btn__key" aria-hidden><PlusIcon /></span>
+          {t('landing.start')}
+        </button>
       </div>
     </form>
   )
@@ -455,7 +458,7 @@ export function BlankForm({ onStarted, compact }: { onStarted?: () => void; comp
 function NewDialog({ onClose }: { onClose: () => void }) {
   const t = useT()
   return (
-    <Sheet title={t('dialogs.new_title')} onClose={onClose} footer={<button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>}>
+    <Sheet title={t('dialogs.new_title')} onClose={onClose} footer={<button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>}>
       <BlankForm compact onStarted={onClose} />
     </Sheet>
   )
@@ -466,7 +469,7 @@ function SaveDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState(doc.stem)
   const go = (format: SaveFormat) => { void save(format, stemOf(name.trim() || 'picture')); onClose() }
   return (
-    <Sheet title={t('dialogs.save_title')} onClose={onClose} footer={<button type="button" className="pt-btn pt-btn-ghost" onClick={onClose}>{t('common.cancel')}</button>}>
+    <Sheet title={t('dialogs.save_title')} onClose={onClose} footer={<button type="button" className="u-btn u-btn--quiet" onClick={onClose}>{t('common.cancel')}</button>}>
       <label className="flex flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
         {t('dialogs.file_name')}
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="pt-input" />

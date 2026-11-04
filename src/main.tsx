@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { UniversalProvider } from '@unisim/sdk'
+import { UniversalProvider, installButtonStyles, installTabStyles } from '@unisim/sdk'
 import App from './App'
 import { I18nRoot } from './i18n'
 import './index.css'
@@ -29,6 +29,11 @@ const universalConfig = {
   noAccounts: true,
   openCount: false,
 }
+
+// The suite's key buttons and tray tabs, as class strings (Dialogs, QrDialog,
+// OptionsRow).
+installButtonStyles()
+installTabStyles()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
