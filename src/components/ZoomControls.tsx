@@ -1,6 +1,7 @@
 // Zoom, over the bottom-right of the canvas. Fit and 100% are a view row:
 // double-tap either to make it how pictures open (the suite rule, 2026-09-30),
-// and the same choice sits in Tune this app ▸ "Pictures open at".
+// and the same choice sits in Tune this app ▸ "Pictures open at". The one set
+// as the default carries the suite's default-view dot.
 import { useDefaultView } from '@unisim/sdk'
 import { OPENS_AT_ROW, showActual, showFit, zoomBy, type OpensAt } from '../lib/actions'
 import { usePaintStore } from '../stores/paintStore'
@@ -23,7 +24,10 @@ export default function ZoomControls() {
         {...props}
         title={`${tip}. ${props.title}`}
         onClick={() => { dv.tap(id); run() }}
-        className="pt-zoombtn rounded-md px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 data-[default-view=true]:text-orange-700 data-[default-view=true]:ring-1 data-[default-view=true]:ring-orange-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:data-[default-view=true]:text-orange-300"
+        // The default view is a 6px orange dot after the label, as on the
+        // suite's tabs (BRANDING.md → Tabs). It was an orange ring, which read
+        // as keyboard focus on a button that wasn't focused.
+        className="pt-zoombtn inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 data-[default-view=true]:after:size-1.5 data-[default-view=true]:after:shrink-0 data-[default-view=true]:after:rounded-full data-[default-view=true]:after:bg-[#e05504] data-[default-view=true]:after:content-[''] dark:text-slate-200 dark:hover:bg-slate-800 dark:data-[default-view=true]:after:bg-[#ff9a1f]"
       >
         {label}
       </button>

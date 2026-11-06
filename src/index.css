@@ -90,9 +90,6 @@ body {
 .dark .pt-choice { color: #e6eaf2; border-color: #475569; }
 .dark .pt-choice:hover { background: rgba(254, 140, 1, 0.1); }
 
-/* The default opening view (Fit / 100%) wears orange, as every suite view row does. */
-[data-default-view='true'] { color: #c2410c; }
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
