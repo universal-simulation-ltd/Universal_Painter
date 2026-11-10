@@ -117,6 +117,9 @@ export default function App() {
     // full-screen web app; 0 in a normal browser tab.
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-100 pt-[env(safe-area-inset-top)] dark:bg-slate-950">
       <UniversalAppsNavBar
+        // Signed in, the bar says whose it is: "Bradley’s Paintings" ("James’ Paintings",
+        // "My Paintings" with no name), and Tune this app gets the account area (James, 2026-11-10 rollout).
+        personalTitle={(name) => (name ? `${/s$/i.test(name.trim()) ? `${name}’` : `${name}’s`} Paintings` : 'My Paintings')}
         product="painter"
         theme={theme}
         productLogo={<ProductLogo />}
