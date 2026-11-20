@@ -85,7 +85,10 @@ export default function QrDialog({ onClose }: { onClose: () => void }) {
           </button>
         ))}
       </div>
-      <div className="mt-4 flex h-40 items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800/60">
+      {/* The preview frames the code that will land on the canvas: the suite's
+          Viewfinder box (BRANDING.md → Boxes, D). Empty, all four corners are
+          muted; once there is a code in frame its leading corner lights up. */}
+      <div className={`u-box u-box--frame ${data ? '' : 'u-box--empty'} mt-4 flex h-44 items-center justify-center rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60`}>
         <div ref={preview} aria-hidden="true" />
         {!data && <span className="text-xs text-slate-400">{t('qr.empty')}</span>}
       </div>

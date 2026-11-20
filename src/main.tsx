@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { UniversalProvider, installButtonStyles, installTabStyles } from '@unisim/sdk'
+import { UniversalProvider, installBoxStyles, installButtonStyles, installTabStyles } from '@unisim/sdk'
 import App from './App'
 import { I18nRoot } from './i18n'
 import './index.css'
@@ -34,6 +34,9 @@ const universalConfig = {
 // OptionsRow).
 installButtonStyles()
 installTabStyles()
+// The suite's box marks (BRANDING.md → Boxes), as class strings
+// (u-box u-box--frame on the QR preview): the sheet goes in once.
+installBoxStyles()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
