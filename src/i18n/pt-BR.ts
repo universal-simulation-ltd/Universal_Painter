@@ -23,6 +23,8 @@ export const ptBR: Draft = {
     rename_tip: 'Clique para renomear',
     size_edit: 'Tamanho da tela',
     size_tip: 'Clique para mudar o tamanho da tela',
+    personal_title: 'Pinturas de {name}',
+    personal_title_mine: 'Minhas pinturas',
   },
   landing: {
     preset_screen: 'Tela',

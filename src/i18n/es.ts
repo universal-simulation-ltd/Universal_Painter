@@ -23,6 +23,8 @@ export const es: Draft = {
     rename_tip: 'Haz clic para cambiar el nombre',
     size_edit: 'Tamaño del lienzo',
     size_tip: 'Haz clic para cambiar el tamaño del lienzo',
+    personal_title: 'Las pinturas de {name}',
+    personal_title_mine: 'Mis pinturas',
   },
   landing: {
     preset_screen: 'Pantalla',

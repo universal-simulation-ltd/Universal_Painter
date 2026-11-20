@@ -23,6 +23,8 @@ export const tr: Draft = {
     rename_tip: 'Yeniden adlandırmak için tıklayın',
     size_edit: 'Tuval boyutu',
     size_tip: 'Tuval boyutunu değiştirmek için tıklayın',
+    personal_title: '{name} · Resimler',
+    personal_title_mine: 'Resimlerim',
   },
   landing: {
     preset_screen: 'Ekran',

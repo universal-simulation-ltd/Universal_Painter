@@ -24,6 +24,8 @@ const app = {
   rename_tip: 'Click to rename',
   size_edit: 'Canvas size',
   size_tip: 'Click to change the canvas size',
+  personal_title: '{name}’s Paintings', // the bar's name for the app once signed in; {name} is the person's first name
+  personal_title_mine: 'My Paintings', // signed in, no name known
 }
 
 const landing = {

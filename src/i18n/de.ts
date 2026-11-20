@@ -23,6 +23,8 @@ export const de: Draft = {
     rename_tip: 'Zum Umbenennen klicken',
     size_edit: 'Leinwandgröße',
     size_tip: 'Klicken, um die Leinwandgröße zu ändern',
+    personal_title: 'Gemälde von {name}',
+    personal_title_mine: 'Meine Gemälde',
   },
   landing: {
     preset_screen: 'Bildschirm',

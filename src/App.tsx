@@ -119,7 +119,16 @@ export default function App() {
       <UniversalAppsNavBar
         // Signed in, the bar says whose it is: "Bradley’s Paintings" ("James’ Paintings",
         // "My Paintings" with no name), and Tune this app gets the account area (James, 2026-11-10 rollout).
-        personalTitle={(name) => (name ? `${/s$/i.test(name.trim()) ? `${name}’` : `${name}’s`} Paintings` : 'My Paintings')}
+        // The account box is Tune this app ▸ Your Universal ID (Call me, App name — "Your …" or the
+        // product's own name — email, the hub, Sign out), as BlackBook and PDF; no greeting in the bar
+        // (James, 2026-10-30: "make this style the global rule").
+        accountInTune
+        // In the app's language; only English says “’s”, and a name ending in s takes the apostrophe alone.
+        personalTitle={(name) => {
+          if (!name) return t('app.personal_title_mine')
+          const title = t('app.personal_title', { name })
+          return /s$/i.test(name.trim()) ? title.replace(`${name}’s`, `${name}’`) : title
+        }}
         product="painter"
         theme={theme}
         productLogo={<ProductLogo />}

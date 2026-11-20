@@ -23,6 +23,8 @@ export const it: Draft = {
     rename_tip: 'Fai clic per rinominare',
     size_edit: 'Dimensioni della tela',
     size_tip: 'Fai clic per cambiare le dimensioni della tela',
+    personal_title: 'I dipinti di {name}',
+    personal_title_mine: 'I miei dipinti',
   },
   landing: {
     preset_screen: 'Schermo',
